@@ -7,9 +7,9 @@ RUN apt-get update && apt-get install -y \
     curl \
     software-properties-common \
     git \
-    && rm -rf /var/lib/apt/lists/* \
-    && apk add --no-cache python3 postgresql-libs && \
-    apk add --no-cache --virtual .build-deps gcc python3-dev musl-dev postgresql-dev && \
+    libpq-dev 
+
+RUN pip install --upgrade pip
 
 COPY .  /app
 
