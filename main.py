@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from datetime import datetime
 from datetime import date
 from dateutil.relativedelta import relativedelta
+from string import Template
 postgres = create_engine(
     'postgresql+psycopg2://postgres:sgwi2341@localhost:5432/jaktim')
 
@@ -55,21 +56,22 @@ def cek_filter(start, end, kpp, map, sektor, segmen):
     return [filter_gabungan, filter_gabungan22]
 
 
-def data_ket(filter):
-    if filter:
-        ket = conn.query(f'''select "KET", 
-        sum(case when p."TAHUNBAYAR" =2022 then p."NOMINAL" end ) as "2022",
-        sum(case when p."TAHUNBAYAR" =2023 then p."NOMINAL" end ) as "2023"
-        from ppmpkm p where p."TAHUNBAYAR">2021 and {filter}
-        GROUP BY p."KET" ''')
-    else:
-        ket = conn.query(f'''select "KET", 
-        sum(case when p."TAHUNBAYAR" =2022 then p."NOMINAL" end ) as "2022",
-        sum(case when p."TAHUNBAYAR" =2023 then p."NOMINAL" end ) as "2023"
-        from ppmpkm p where p."TAHUNBAYAR">2021 
-        GROUP BY p."KET" ''')
-    ket['selisih'] = ket['2023']-ket['2022']
-    return ket
+def data_ket(filter, filter22):
+    ket = conn.query(f'''select p."KET",
+    sum(case when p."TAHUNBAYAR" =2023 then p."NOMINAL" end ) as "2023"
+    from ppmpkm p
+    where {filter}
+    GROUP BY p."KET"     ''')
+
+    ket22 = conn.query(f'''select p."KET",
+    sum(case when p."TAHUNBAYAR" =2022 then p."NOMINAL" end ) as "2022"
+    from ppmpkm p
+    where {filter22}
+    GROUP BY p."KET"     ''')
+
+    ketgab = ket.merge(ket22, on='KET', how='left')
+    ketgab['selisih'] = ketgab['2023']-ketgab['2022']
+    return ketgab
 
 
 # Sidebar
@@ -101,7 +103,7 @@ filter = 'and'.join(x for x in filter_gabungan[0])
 filter22 = 'and'.join(x for x in filter_gabungan[1])
 
 # # KPI
-col_tahun = st.columns(3)
+col_tahun = st.columns(5)
 with col_tahun[0]:
     if filter:
         data23 = conn.query(
@@ -119,12 +121,44 @@ with col_tahun[1]:
             f'''select sum("NOMINAL") from ppmpkm p where {filter_gabungan[1][0] +'and'+ filter_gabungan[1][1]} ''')["sum"].sum()
     st.metric('2022',  '{:,.1f}M'.format(data22/1000000000))
 with col_tahun[2]:
-    selisih = data23-data22
+    selisih = (data23-data22)
     st.metric('Kenaikan',  '{:,.1f}M'.format(selisih/1000000000))
+with col_tahun[3]:
+    selisih = (data23-data22)
+    tumbuh = selisih/data22
+    st.metric('Tumbuh',  '{:.1f}%'.format(tumbuh*100))
+with col_tahun[4]:
+    persentase = data23/27601733880000
+    st.metric('Kontrib Target Kanwil',  '{:.2f}%'.format(persentase*100))
 
-st.write(filter_gabungan)
-st.write(filter)
-st.write(type(start))
+st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
+            unsafe_allow_html=True)
 # KET
-# ket = data_ket(filter)
-# st.dataframe(ket)
+ket = data_ket(filter, filter22).set_index('KET')
+
+colket = st.columns(5)
+with colket[0]:
+    format_number = "{:+,.1f}M" if ket.loc['MPN',
+                                           'selisih'] >= 0 else "{:-,.1f}M"
+    st.metric('MPN', format_number.format(ket.loc['MPN',
+                                                  'selisih']/1000000000))
+with colket[1]:
+    format_number = "{:+,.1f}M" if ket.loc['SPM',
+                                           'selisih'] >= 0 else "{:-,.1f}M"
+    st.metric('SPM', format_number.format(ket.loc['SPM',
+                                                  'selisih']/1000000000))
+with colket[2]:
+    format_number = "{:+,.1f}M" if ket.loc['PBK KIRIM',
+                                           'selisih'] >= 0 else "{:-,.1f}M"
+    st.metric('PBK KIRIM', format_number.format(ket.loc['PBK KIRIM',
+                                                        'selisih']/1000000000))
+with colket[3]:
+    format_number = "{:+,.1f}M" if ket.loc['PBK TERIMA',
+                                           'selisih'] >= 0 else "{:-,.1f}M"
+    st.metric('PBK TERIMA', format_number.format(ket.loc['PBK TERIMA',
+                                                         'selisih']/1000000000))
+with colket[4]:
+    format_number = "{:+,.1f}M" if ket.loc['SPMKP',
+                                           'selisih'] >= 0 else "{:-,.1f}M"
+    st.metric('SPMKP', format_number.format(ket.loc['SPMKP',
+                                                    'selisih']/1000000000))
