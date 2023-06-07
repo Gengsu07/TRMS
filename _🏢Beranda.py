@@ -4,15 +4,22 @@ from sqlalchemy import create_engine
 from datetime import datetime
 from datetime import date
 from dateutil.relativedelta import relativedelta
-from string import Template
+import plotly.express as px
+import calendar
 postgres = create_engine(
     'postgresql+psycopg2://postgres:sgwi2341@localhost:5432/jaktim')
 
 # settings
 st.set_page_config(
-    page_title="TEMS",
-    page_icon="🧠",
+    page_title="Tax Earning Monitoring Sistem",
+    page_icon="🚀",
     layout='wide')
+padding = 0
+st.markdown(f""" <style>.reportview-container .main .block-container{{
+        padding-top: {padding}rem;
+        padding-right: {0}rem;
+        padding-left: {0}rem;
+        padding-bottom: {padding}rem;}} </style> """, unsafe_allow_html=True)
 conn = st.experimental_connection('ppmpkm', type='sql')
 
 
@@ -95,12 +102,13 @@ with st.sidebar:
 
 
 # Main apps
-st.title('Tax Earning Monitoring Sistem')
+# st.title('Tax Earning Monitoring Sistem')
 
 # filterdata
 filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen)
 filter = 'and'.join(x for x in filter_gabungan[0])
 filter22 = 'and'.join(x for x in filter_gabungan[1])
+
 
 # # KPI
 col_tahun = st.columns(5)
@@ -162,3 +170,43 @@ with colket[4]:
                                            'selisih'] >= 0 else "{:-,.1f}M"
     st.metric('SPMKP', format_number.format(ket.loc['SPMKP',
                                                     'selisih']/1000000000))
+
+st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
+            unsafe_allow_html=True)
+
+
+# title={'text': 'Penerimaan Per Bulan',
+#                                'x': 0.5, 'xanchor': 'center', 'yanchor': 'top',
+#                                'font': {'size': 24}},
+# bar
+bardata = conn.query(
+    f'''select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
+            where {filter}
+            GROUP BY p."BULANBAYAR",p."TAHUNBAYAR"
+            UNION ALL
+            select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
+            where {filter22}
+            GROUP BY p."BULANBAYAR" ,p."TAHUNBAYAR"
+            ''')
+bardata['TAHUNBAYAR'] = bardata['TAHUNBAYAR'].astype('str')
+barchart = px.bar(data_frame=bardata, x="BULANBAYAR",
+                  y='sum', color='TAHUNBAYAR', barmode='group', width=1024, height=380)
+barchart.update_layout(xaxis_title='', yaxis_title='',
+                       xaxis={
+                           'tickmode': 'array',
+                           'tickvals': [x for x in range(1, 13)],
+                           'ticktext': [calendar.month_name[i] for i in range(1, 13)]
+                       })
+st.plotly_chart(barchart)
+st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
+            unsafe_allow_html=True)
+data_kpp = conn.query(
+    f'''select p."ADMIN",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
+            where {filter}
+            GROUP BY p."ADMIN",p."TAHUNBAYAR"
+            UNION ALL
+            select p."ADMIN",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
+            where {filter22}
+            GROUP BY p."ADMIN" ,p."TAHUNBAYAR"
+            ''')
+st.dataframe(data_kpp)
