@@ -1,0 +1,19 @@
+# renpen_realisasi
+renpen_realisasi = conn.query('select * from renpen_realisasi')
+renpen_realisasi = renpen_realisasi.groupby(
+    ['BULAN', 'JENIS'])['JUMLAH'].sum().reset_index()
+renpen_realisasi['text'] = renpen_realisasi['JUMLAH'].apply(lambda x: "{:,.1f}M".format(
+    x/1000000000))
+linechart = px.line(renpen_realisasi, x='BULAN',
+                    y='JUMLAH', color='JENIS', text='text', width=960)
+linechart.update_layout(xaxis_title='', yaxis_title='',
+                        yaxis={'visible': False},
+                        xaxis={
+                            'dtick': 0.1,
+                            'tickmode': 'array',
+                            'tickvals': [x for x in range(1, 13)],
+                            'ticktext': [calendar.month_name[i] for i in range(1, 13)]
+                        }, autosize=True)
+
+with chart_container(renpen_realisasi):
+    st.plotly_chart(linechart)

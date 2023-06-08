@@ -6,20 +6,26 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 import plotly.express as px
 import calendar
-postgres = create_engine(
-    'postgresql+psycopg2://postgres:sgwi2341@localhost:5432/jaktim')
+from streamlit_extras.chart_container import chart_container
+from streamlit_extras.app_logo import add_logo
+from streamlit_extras.colored_header import colored_header
+
+# postgres = create_engine(
+#     'postgresql+psycopg2://postgres:sgwi2341@localhost:5432/jaktim')
 
 # settings
 st.set_page_config(
     page_title="Tax Earning Monitoring Sistem",
     page_icon="🚀",
     layout='wide')
-padding = 0
-st.markdown(f""" <style>.reportview-container .main .block-container{{
-        padding-top: {padding}rem;
-        padding-right: {0}rem;
-        padding-left: {0}rem;
-        padding-bottom: {padding}rem;}} </style> """, unsafe_allow_html=True)
+with open('style.css') as f:
+    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+# padding = 0
+# st.markdown(f""" <style>.reportview-container .main .block-container{{
+#         padding-top: {padding}rem;
+#         padding-right: {0}rem;
+#         padding-left: {0}rem;
+#         padding-bottom: {padding}rem;}} </style> """, unsafe_allow_html=True)
 conn = st.experimental_connection('ppmpkm', type='sql')
 
 
@@ -83,6 +89,11 @@ def data_ket(filter, filter22):
 
 # Sidebar
 with st.sidebar:
+    add_logo("unit.png", height=150)
+    colored_header(
+        label='Tax Earning Monitoring System',
+        description='Pilih Filter Data',
+        color_name='yellow-80')
     mindate = datetime.strptime('2023-01-01', "%Y-%m-%d")
     start = st.date_input(
         "Tgl Mulai", min_value=mindate, value=mindate)
@@ -119,7 +130,10 @@ with col_tahun[0]:
     else:
         data23 = conn.query(
             f'''select sum("NOMINAL") from ppmpkm p where {filter_gabungan[0][0] +'and'+ filter_gabungan[0][1]} ''')["sum"].sum()
-    st.metric('2023', '{:,.1f}M'.format(data23/1000000000))
+    if (data23/1000000000000) > 1:
+        st.metric('2023', '{:,.1f}T'.format(data23/1000000000000))
+    else:
+        st.metric('2023', '{:,.1f}M'.format(data23/1000000000))
 with col_tahun[1]:
     if filter:
         data22 = conn.query(
@@ -127,10 +141,16 @@ with col_tahun[1]:
     else:
         data22 = conn.query(
             f'''select sum("NOMINAL") from ppmpkm p where {filter_gabungan[1][0] +'and'+ filter_gabungan[1][1]} ''')["sum"].sum()
-    st.metric('2022',  '{:,.1f}M'.format(data22/1000000000))
+    if (data22/1000000000000) > 1:
+        st.metric('2022', '{:,.1f}T'.format(data22/1000000000000))
+    else:
+        st.metric('2022',  '{:,.1f}M'.format(data22/1000000000))
 with col_tahun[2]:
     selisih = (data23-data22)
-    st.metric('Kenaikan',  '{:,.1f}M'.format(selisih/1000000000))
+    if (selisih) > 1000000000000:
+        st.metric('Kenaikan', '{:,.1f}T'.format(selisih/1000000000000))
+    else:
+        st.metric('Kenaikan',  '{:,.1f}M'.format(selisih/1000000000))
 with col_tahun[3]:
     selisih = (data23-data22)
     tumbuh = selisih/data22
@@ -148,8 +168,14 @@ colket = st.columns(5)
 with colket[0]:
     format_number = "{:+,.1f}M" if ket.loc['MPN',
                                            'selisih'] >= 0 else "{:-,.1f}M"
-    st.metric('MPN', format_number.format(ket.loc['MPN',
-                                                  'selisih']/1000000000))
+    format_number_T = "{:+,.1f}T" if ket.loc['MPN',
+                                             'selisih'] >= 0 else "{:-,.1f}T"
+    if ket.loc['MPN', 'selisih'] > 1000000000000:
+        st.metric('MPN', format_number_T.format(ket.loc['MPN',
+                                                        'selisih']/1000000000000))
+    else:
+        st.metric('MPN', format_number.format(ket.loc['MPN',
+                                                      'selisih']/1000000000))
 with colket[1]:
     format_number = "{:+,.1f}M" if ket.loc['SPM',
                                            'selisih'] >= 0 else "{:-,.1f}M"
@@ -171,13 +197,13 @@ with colket[4]:
     st.metric('SPMKP', format_number.format(ket.loc['SPMKP',
                                                     'selisih']/1000000000))
 
-st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
-            unsafe_allow_html=True)
-
 
 # title={'text': 'Penerimaan Per Bulan',
 #                                'x': 0.5, 'xanchor': 'center', 'yanchor': 'top',
 #                                'font': {'size': 24}},
+
+st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
+            unsafe_allow_html=True)
 # bar
 bardata = conn.query(
     f'''select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
@@ -189,24 +215,17 @@ bardata = conn.query(
             GROUP BY p."BULANBAYAR" ,p."TAHUNBAYAR"
             ''')
 bardata['TAHUNBAYAR'] = bardata['TAHUNBAYAR'].astype('str')
+bardata['text'] = bardata['sum'].apply(lambda x: "{:,.1f}M".format(
+    x/1000000000))
 barchart = px.bar(data_frame=bardata, x="BULANBAYAR",
-                  y='sum', color='TAHUNBAYAR', barmode='group', width=1024, height=380)
+                  y='sum', color='TAHUNBAYAR', barmode='group', text='text', width=960, height=380)
 barchart.update_layout(xaxis_title='', yaxis_title='',
+                       yaxis={'visible': False},
                        xaxis={
                            'tickmode': 'array',
                            'tickvals': [x for x in range(1, 13)],
                            'ticktext': [calendar.month_name[i] for i in range(1, 13)]
-                       })
-st.plotly_chart(barchart)
-st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
-            unsafe_allow_html=True)
-data_kpp = conn.query(
-    f'''select p."ADMIN",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
-            where {filter}
-            GROUP BY p."ADMIN",p."TAHUNBAYAR"
-            UNION ALL
-            select p."ADMIN",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
-            where {filter22}
-            GROUP BY p."ADMIN" ,p."TAHUNBAYAR"
-            ''')
-st.dataframe(data_kpp)
+                       }, autosize=True)
+
+with chart_container(bardata):
+    st.plotly_chart(barchart)
