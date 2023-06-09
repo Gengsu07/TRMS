@@ -18,7 +18,7 @@ prep = importlib.import_module('db')
 
 # settings
 st.set_page_config(
-    page_title="Tax Earning Monitoring Sistem",
+    page_title="Tax Revenue Monitoring Sistem",
     page_icon="🚀",
     layout='wide')
 with open('style.css') as f:
@@ -89,7 +89,7 @@ def data_ket(filter, filter22):
 with st.sidebar:
     add_logo("unit.png", height=150)
     colored_header(
-        label='Tax Earning Monitoring System',
+        label='Tax Revenue Monitoring System',
         description='Pilih Filter Data',
         color_name='yellow-80')
     mindate = datetime.strptime('2023-01-01', "%Y-%m-%d")
@@ -110,7 +110,7 @@ with st.sidebar:
     segmen = st.multiselect('SEGMENTASI', options=segmen.iloc[:, 0].tolist())
 
 # Main apps
-st.subheader('Tax Earning Monitoring Sistem')
+st.subheader('Tax Revenue Monitoring Sistem')
 
 # filterdata
 filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen)
@@ -229,7 +229,7 @@ data_funnel = prep.bruto(filter)
 data_funnel_chart = data_funnel.loc[:9,]
 data_funnel_chart['x'] = data_funnel_chart['BRUTO']/1000000000
 funnel_chart = px.funnel(data_funnel_chart, x='x',
-                         y='NAMA_WP', text='KONTRIBUSI', width=1024, height=640,
+                         y='NAMA_WP', text='KONTRIBUSI', width=1280, height=640,
                          log_x=True, title='10 WP Penyumbang Penerimaan Terbesar Bruto')
 funnel_chart.update_traces(
     texttemplate='%{x:,.2f}M <br> (%{customdata:.2f}%)', customdata=data_funnel_chart['KONTRIBUSI'])
