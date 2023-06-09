@@ -9,6 +9,7 @@ import calendar
 from streamlit_extras.chart_container import chart_container
 from streamlit_extras.app_logo import add_logo
 from streamlit_extras.colored_header import colored_header
+from streamlit_extras.metric_cards import style_metric_cards
 
 # postgres = create_engine(
 #     'postgresql+psycopg2://postgres:sgwi2341@localhost:5432/jaktim')
@@ -20,12 +21,7 @@ st.set_page_config(
     layout='wide')
 with open('style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-# padding = 0
-# st.markdown(f""" <style>.reportview-container .main .block-container{{
-#         padding-top: {padding}rem;
-#         padding-right: {0}rem;
-#         padding-left: {0}rem;
-#         padding-bottom: {padding}rem;}} </style> """, unsafe_allow_html=True)
+
 conn = st.experimental_connection('ppmpkm', type='sql')
 
 
@@ -111,15 +107,40 @@ with st.sidebar:
         '''select distinct "SEGMENTASI_WP" from ppmpkm where "SEGMENTASI_WP" notnull and "SEGMENTASI_WP"!='' ''')
     segmen = st.multiselect('SEGMENTASI', options=segmen.iloc[:, 0].tolist())
 
-
 # Main apps
-# st.title('Tax Earning Monitoring Sistem')
+st.subheader('Tax Earning Monitoring Sistem')
 
 # filterdata
 filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen)
 filter = 'and'.join(x for x in filter_gabungan[0])
 filter22 = 'and'.join(x for x in filter_gabungan[1])
 
+linedata = conn.query(
+    f'''select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
+            where {filter}
+            GROUP BY p."BULANBAYAR",p."TAHUNBAYAR"
+            UNION ALL
+            select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
+            where {filter22}
+            GROUP BY p."BULANBAYAR" ,p."TAHUNBAYAR"
+            ''')
+linedata['TAHUNBAYAR'] = linedata['TAHUNBAYAR'].astype('str')
+linedata = linedata.groupby(['TAHUNBAYAR', 'BULANBAYAR'])[
+    'sum'].sum().reset_index()
+linedata['text'] = linedata['sum'].apply(lambda x: "{:,.1f}M".format(
+    x/1000000000))
+linechart = px.area(data_frame=linedata, x="BULANBAYAR",
+                    y='sum', color='TAHUNBAYAR', text='text', width=1024, height=380)
+linechart.update_layout(xaxis_title='', yaxis_title='',
+                        yaxis={'visible': False},
+                        xaxis={
+                            'tickmode': 'array',
+                            'tickvals': [x for x in range(1, 13)],
+                            'ticktext': [calendar.month_name[i] for i in range(1, 13)]
+                        }, autosize=True)
+
+with chart_container(linedata):
+    st.plotly_chart(linechart)
 
 # # KPI
 col_tahun = st.columns(5)
@@ -159,17 +180,18 @@ with col_tahun[4]:
     persentase = data23/27601733880000
     st.metric('Kontrib Target Kanwil',  '{:.2f}%'.format(persentase*100))
 
+style_metric_cards(background_color='#FFFFFF',
+                   border_color='#ffc91b', border_left_color='#ffc91b')
 st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
             unsafe_allow_html=True)
 # KET
 ket = data_ket(filter, filter22).set_index('KET')
-
+format_number = "{:+,.1f}M" if ket.loc['MPN',
+                                       'selisih'] >= 0 else "{:-,.1f}M"
+format_number_T = "{:+,.1f}T" if ket.loc['MPN',
+                                         'selisih'] >= 0 else "{:-,.1f}T"
 colket = st.columns(5)
 with colket[0]:
-    format_number = "{:+,.1f}M" if ket.loc['MPN',
-                                           'selisih'] >= 0 else "{:-,.1f}M"
-    format_number_T = "{:+,.1f}T" if ket.loc['MPN',
-                                             'selisih'] >= 0 else "{:-,.1f}T"
     if ket.loc['MPN', 'selisih'] > 1000000000000:
         st.metric('MPN', format_number_T.format(ket.loc['MPN',
                                                         'selisih']/1000000000000))
@@ -179,6 +201,7 @@ with colket[0]:
 with colket[1]:
     format_number = "{:+,.1f}M" if ket.loc['SPM',
                                            'selisih'] >= 0 else "{:-,.1f}M"
+
     st.metric('SPM', format_number.format(ket.loc['SPM',
                                                   'selisih']/1000000000))
 with colket[2]:
@@ -205,27 +228,3 @@ with colket[4]:
 st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
             unsafe_allow_html=True)
 # bar
-bardata = conn.query(
-    f'''select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
-            where {filter}
-            GROUP BY p."BULANBAYAR",p."TAHUNBAYAR"
-            UNION ALL
-            select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
-            where {filter22}
-            GROUP BY p."BULANBAYAR" ,p."TAHUNBAYAR"
-            ''')
-bardata['TAHUNBAYAR'] = bardata['TAHUNBAYAR'].astype('str')
-bardata['text'] = bardata['sum'].apply(lambda x: "{:,.1f}M".format(
-    x/1000000000))
-barchart = px.bar(data_frame=bardata, x="BULANBAYAR",
-                  y='sum', color='TAHUNBAYAR', barmode='group', text='text', width=960, height=380)
-barchart.update_layout(xaxis_title='', yaxis_title='',
-                       yaxis={'visible': False},
-                       xaxis={
-                           'tickmode': 'array',
-                           'tickvals': [x for x in range(1, 13)],
-                           'ticktext': [calendar.month_name[i] for i in range(1, 13)]
-                       }, autosize=True)
-
-with chart_container(bardata):
-    st.plotly_chart(barchart)
