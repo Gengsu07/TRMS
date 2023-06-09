@@ -1,9 +1,11 @@
 import pandas as pd
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
-password = quote_plus('kwl@110')
-postgres = create_engine(
-    f'postgresql+psycopg2://oc:{password}@10.20.254.228:5432/penerimaan')
+import streamlit as st
+# password = quote_plus('kwl@110')
+# postgres = create_engine(
+#     f'postgresql+psycopg2://oc:{password}@10.20.254.228:5432/penerimaan')
+conn = st.experimental_connection('ppmpkm', type='sql')
 
 
 def bruto(filter):
@@ -18,7 +20,7 @@ def bruto(filter):
     group by p."NPWP" ,p."NAMA_WP" 
     order by "BRUTO" desc
     '''
-    bruto = pd.read_sql(kueri, con=postgres)
+    bruto = conn.query(kueri)
     # brutomin = bruto[bruto['BRUTO']<0].index.tolist()
     row = bruto.shape[0]+1
     # rowplus = row-len(brutomin)
