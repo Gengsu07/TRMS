@@ -176,7 +176,10 @@ with col_tahun[2]:
         st.metric('Kenaikan',  '{:,.1f}M'.format(selisih/1000000000))
 with col_tahun[3]:
     selisih = (data23-data22)
-    tumbuh = selisih/data22
+    if (data22 == 0) | (selisih == 0):
+        tumbuh = 0
+    else:
+        tumbuh = selisih/data22
     st.metric('Tumbuh',  '{:.1f}%'.format(tumbuh*100))
 with col_tahun[4]:
     persentase = data23/27601733880000
@@ -188,39 +191,55 @@ st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:
             unsafe_allow_html=True)
 # KET
 ket = data_ket(filter, filter22).set_index('KET')
-format_number = "{:+,.1f}M" if ket.loc['MPN',
-                                       'selisih'] >= 0 else "{:-,.1f}M"
-format_number_T = "{:+,.1f}T" if ket.loc['MPN',
-                                         'selisih'] >= 0 else "{:-,.1f}T"
+
 colket = st.columns(5)
 with colket[0]:
-    if ket.loc['MPN', 'selisih'] > 1000000000000:
-        st.metric('MPN', format_number_T.format(ket.loc['MPN',
-                                                        'selisih']/1000000000000))
-    else:
-        st.metric('MPN', format_number.format(ket.loc['MPN',
-                                                      'selisih']/1000000000))
-with colket[1]:
-    format_number = "{:+,.1f}M" if ket.loc['SPM',
-                                           'selisih'] >= 0 else "{:-,.1f}M"
 
-    st.metric('SPM', format_number.format(ket.loc['SPM',
-                                                  'selisih']/1000000000))
+    if 'MPN' in ket.index:
+        format_number = "{:+,.1f}M" if ket.loc['MPN',
+                                               'selisih'] >= 0 else "{:-,.1f}M"
+        format_number_T = "{:+,.1f}T" if ket.loc['MPN',
+                                                 'selisih'] >= 0 else "{:-,.1f}T"
+        if ket.loc['MPN', 'selisih'] > 1000000000000:
+            st.metric('MPN', format_number_T.format(ket.loc['MPN',
+                                                            'selisih']/1000000000000))
+        else:
+            st.metric('MPN', format_number.format(ket.loc['MPN',
+                                                          'selisih']/1000000000))
+    else:
+        st.metric('MPN', '0M')
+with colket[1]:
+    if 'SPM' in ket.index:
+        format_number = "{:+,.1f}M" if ket.loc['SPM',
+                                               'selisih'] >= 0 else "{:-,.1f}M"
+        st.metric('SPM', format_number.format(ket.loc['SPM',
+                                                      'selisih']/1000000000))
+    else:
+        st.metric('SPM', "0.0M")
 with colket[2]:
-    format_number = "{:+,.1f}M" if ket.loc['PBK KIRIM',
-                                           'selisih'] >= 0 else "{:-,.1f}M"
-    st.metric('PBK KIRIM', format_number.format(ket.loc['PBK KIRIM',
-                                                        'selisih']/1000000000))
+    if 'PBK KIRIM' in ket.index:
+        format_number = "{:+,.1f}M" if ket.loc['PBK KIRIM',
+                                               'selisih'] >= 0 else "{:-,.1f}M"
+        st.metric('PBK KIRIM', format_number.format(ket.loc['PBK KIRIM',
+                                                            'selisih']/1000000000))
+    else:
+        st.metric('PBK KIRIM', "0.0M")
 with colket[3]:
-    format_number = "{:+,.1f}M" if ket.loc['PBK TERIMA',
-                                           'selisih'] >= 0 else "{:-,.1f}M"
-    st.metric('PBK TERIMA', format_number.format(ket.loc['PBK TERIMA',
-                                                         'selisih']/1000000000))
+    if 'PBK TERIMA' in ket.index:
+        format_number = "{:+,.1f}M" if ket.loc['PBK TERIMA',
+                                               'selisih'] >= 0 else "{:-,.1f}M"
+        st.metric('PBK TERIMA', format_number.format(ket.loc['PBK TERIMA',
+                                                             'selisih']/1000000000))
+    else:
+        st.metric('PBK TERIMA', "0.0M")
 with colket[4]:
-    format_number = "{:+,.1f}M" if ket.loc['SPMKP',
-                                           'selisih'] >= 0 else "{:-,.1f}M"
-    st.metric('SPMKP', format_number.format(ket.loc['SPMKP',
-                                                    'selisih']/1000000000))
+    if 'SPMKP' in ket.index:
+        format_number = "{:+,.1f}M" if ket.loc['SPMKP',
+                                               'selisih'] >= 0 else "{:-,.1f}M"
+        st.metric('SPMKP', format_number.format(ket.loc['SPMKP',
+                                                        'selisih']/1000000000))
+    else:
+        st.metric('SPMKP', '0.0M')
 
 st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
             unsafe_allow_html=True)
