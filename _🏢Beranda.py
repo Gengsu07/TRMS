@@ -10,7 +10,9 @@ from streamlit_extras.chart_container import chart_container
 from streamlit_extras.app_logo import add_logo
 from streamlit_extras.colored_header import colored_header
 from streamlit_extras.metric_cards import style_metric_cards
-
+from plotly import graph_objects as go
+import importlib
+prep = importlib.import_module('db')
 # postgres = create_engine(
 #     'postgresql+psycopg2://postgres:sgwi2341@localhost:5432/jaktim')
 
@@ -220,11 +222,23 @@ with colket[4]:
     st.metric('SPMKP', format_number.format(ket.loc['SPMKP',
                                                     'selisih']/1000000000))
 
-
-# title={'text': 'Penerimaan Per Bulan',
-#                                'x': 0.5, 'xanchor': 'center', 'yanchor': 'top',
-#                                'font': {'size': 24}},
-
 st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
             unsafe_allow_html=True)
-# bar
+
+data_funnel = prep.bruto(filter)
+data_funnel_chart = data_funnel.loc[:9,]
+data_funnel_chart['x'] = data_funnel_chart['BRUTO']/1000000000
+funnel_chart = px.funnel(data_funnel_chart, x='x',
+                         y='NAMA_WP', text='KONTRIBUSI', width=1024, height=640,
+                         log_x=True, title='10 WP Penyumbang Penerimaan Terbesar Bruto')
+funnel_chart.update_traces(
+    texttemplate='%{x:,.2f}M <br> (%{customdata:.2f}%)', customdata=data_funnel_chart['KONTRIBUSI'])
+funnel_chart.update_layout(xaxis_title='', yaxis_title='',
+                           title={
+                               'x': 0.5,
+                               'font_size': 24
+                           },
+                           autosize=True)
+
+with chart_container(data_funnel):
+    st.plotly_chart(funnel_chart)
