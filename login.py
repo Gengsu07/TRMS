@@ -45,6 +45,6 @@ def usernames():
 
 
 if __name__ == '__main__':
-    print(names())
-    print(usernames())
-    print(load_pass())
+    create_hash()
+    passw = load_pass()
+    print(passw)

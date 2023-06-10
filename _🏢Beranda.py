@@ -12,7 +12,7 @@ from streamlit_extras.chart_container import chart_container
 from streamlit_extras.app_logo import add_logo
 from streamlit_extras.colored_header import colored_header
 from streamlit_extras.metric_cards import style_metric_cards
-from plotly import graph_objects as go
+import altair as alt
 import importlib
 prep = importlib.import_module('db')
 passw = importlib.import_module('login')
@@ -275,6 +275,32 @@ elif st.session_state['authentication_status']:
 
     st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
                 unsafe_allow_html=True)
+
+    data_sektor_awal = prep.sektor(filter)
+    # data_sektor = data_sektor_awal.melt(
+    #     id_vars='NM_KATEGORI', var_name='JENIS', value_name='NOMINAL', value_vars=['NETTO', 'BRUTO'])
+
+    # sektor = alt.Chart(data_sektor).mark_bar().encode(
+    #     x=alt.X('sum(NOMINAL)', stack='normalize'),
+    #     y='NM_KATEGORI',
+    #     color='JENIS'
+    # )
+    # st.altair_chart(sektor)
+    data_sektor_awal = data_sektor_awal.groupby(
+        ['NM_KATEGORI'])['NETTO'].sum().reset_index().sort_values(by='NETTO', ascending=True)
+    data_sektor_awal['text'] = data_sektor_awal['NETTO'].apply(
+        lambda x: '{:,.1f}M'.format(x/1000000000))
+    bar_sektor = px.bar(data_sektor_awal, y='NM_KATEGORI', x='NETTO', title="Per Sektor", orientation='h', text='text',
+                        width=1024, height=1024)
+    bar_sektor.update_layout(xaxis_title='', yaxis_title='',
+                             xaxis={'visible': False},
+                             title={
+                                 'x': 0.5,
+                                 'font_size': 24
+                             },
+                             autosize=True, showlegend=False)
+    st.plotly_chart(bar_sektor)
+    st.dataframe(data_sektor_awal)
 
     data_funnel = prep.bruto(filter)
     data_funnel_chart = data_funnel.loc[:9,]
