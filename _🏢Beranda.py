@@ -89,7 +89,7 @@ def data_ket(filter, filter22):
     return ketgab
 
 
-# ---AUTHENTICATION---
+# ---AUTHENTICATION-------------------------------------------------------
 with open('.streamlit/login.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
 
@@ -141,7 +141,7 @@ elif st.session_state['authentication_status']:
         segmen = st.multiselect(
             'SEGMENTASI', options=segmen.iloc[:, 0].tolist())
 
-# Main apps
+# Main apps-----------------------------------------------------------------------
     st.subheader('Tax Revenue Monitoring Sistem')
 
 # filterdata
@@ -149,6 +149,7 @@ elif st.session_state['authentication_status']:
     filter = 'and'.join(x for x in filter_gabungan[0])
     filter22 = 'and'.join(x for x in filter_gabungan[1])
 
+# linechart--------------------
     linedata = conn.query(
         f'''select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
                 where {filter}
@@ -176,7 +177,10 @@ elif st.session_state['authentication_status']:
     with chart_container(linedata):
         st.plotly_chart(linechart)
 
-# KPI
+
+# KPI-----------------------------------------------------
+    style_metric_cards(background_color='#FFFFFF',
+                       border_color='#ffc91b', border_left_color='#ffc91b')
     col_tahun = st.columns(5)
     with col_tahun[0]:
         if filter:
@@ -186,7 +190,8 @@ elif st.session_state['authentication_status']:
             data23 = conn.query(
                 f'''select sum("NOMINAL") from ppmpkm p where {filter_gabungan[0][0] +'and'+ filter_gabungan[0][1]} ''')["sum"].sum()
         if (data23/1000000000000) > 1:
-            st.metric('2023', '{:,.1f}T'.format(data23/1000000000000))
+            st.metric('2023', '{:,.1f}T'.format(
+                data23/1000000000000))
         else:
             st.metric('2023', '{:,.1f}M'.format(data23/1000000000))
     with col_tahun[1]:
@@ -217,13 +222,11 @@ elif st.session_state['authentication_status']:
         persentase = data23/27601733880000
         st.metric('Kontrib Target Kanwil',  '{:.2f}%'.format(persentase*100))
 
-    style_metric_cards(background_color='#FFFFFF',
-                       border_color='#ffc91b', border_left_color='#ffc91b')
     st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
                 unsafe_allow_html=True)
-# KET
-    ket = data_ket(filter, filter22).set_index('KET')
 
+# KET-------------------------------------------------
+    ket = data_ket(filter, filter22).set_index('KET')
     colket = st.columns(5)
     with colket[0]:
 
@@ -276,7 +279,7 @@ elif st.session_state['authentication_status']:
     st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
                 unsafe_allow_html=True)
 
-# PERSEKTOR
+# PERSEKTOR--------------------------------------------
     data_sektor_awal = prep.sektor(filter)
     data_sektor_awal = data_sektor_awal.groupby(
         ['NM_KATEGORI'])['NETTO'].sum().reset_index().sort_values(by='NETTO', ascending=False)
@@ -304,7 +307,8 @@ elif st.session_state['authentication_status']:
 
     st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
                 unsafe_allow_html=True)
-# JENIS PAJAK
+
+# JENIS PAJAK-----------------------------------------------
     jenis_pajak = prep.jenis_pajak(filter)
     jenis_pajak9 = jenis_pajak.nlargest(10, 'NETTO')
     jenis_pajak_lain = jenis_pajak[~jenis_pajak['MAP'].isin(
