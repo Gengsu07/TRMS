@@ -91,3 +91,17 @@ def sektor(filter):
     }
     data_sektor['NM_KATEGORI'] = data_sektor['NM_KATEGORI'].map(dict_sektor)
     return data_sektor
+
+
+def jenis_pajak(filter):
+    kueri = f'''
+    SELECT 
+    p."MAP" , sum(p."NOMINAL") AS "NETTO" 
+    FROM 
+    public.ppmpkm p 
+    WHERE {filter}
+    GROUP BY p."MAP" 
+    ORDER BY sum(p."NOMINAL") DESC  
+    '''
+    jenis = conn.query(kueri)
+    return jenis

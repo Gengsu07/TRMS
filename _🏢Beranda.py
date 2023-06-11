@@ -276,38 +276,68 @@ elif st.session_state['authentication_status']:
     st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
                 unsafe_allow_html=True)
 
+# PERSEKTOR
     data_sektor_awal = prep.sektor(filter)
-    # data_sektor = data_sektor_awal.melt(
-    #     id_vars='NM_KATEGORI', var_name='JENIS', value_name='NOMINAL', value_vars=['NETTO', 'BRUTO'])
-
-    # sektor = alt.Chart(data_sektor).mark_bar().encode(
-    #     x=alt.X('sum(NOMINAL)', stack='normalize'),
-    #     y='NM_KATEGORI',
-    #     color='JENIS'
-    # )
-    # st.altair_chart(sektor)
     data_sektor_awal = data_sektor_awal.groupby(
-        ['NM_KATEGORI'])['NETTO'].sum().reset_index().sort_values(by='NETTO', ascending=True)
-    data_sektor_awal['text'] = data_sektor_awal['NETTO'].apply(
+        ['NM_KATEGORI'])['NETTO'].sum().reset_index().sort_values(by='NETTO', ascending=False)
+    data_sektor9 = data_sektor_awal.nlargest(10, 'NETTO')
+    data_sektor_lain = data_sektor_awal[~data_sektor_awal['NM_KATEGORI'].isin(
+        data_sektor9['NM_KATEGORI'])]
+    data_sektor_lain = pd.DataFrame(
+        [['LAINNYA', data_sektor_lain['NETTO'].sum()]], columns=['NM_KATEGORI', 'NETTO'])
+    data_sektor = pd.concat(
+        [data_sektor9, data_sektor_lain], axis=0, ignore_index=True)
+    data_sektor['text'] = data_sektor['NETTO'].apply(
         lambda x: '{:,.1f}M'.format(x/1000000000))
-    bar_sektor = px.bar(data_sektor_awal, y='NM_KATEGORI', x='NETTO', title="Per Sektor", orientation='h', text='text',
-                        width=1024, height=1024)
+    bar_sektor = px.bar(data_sektor, y='NM_KATEGORI', x='NETTO', title="Per Sektor(Netto)", orientation='h', text='text',
+                        width=1024, height=640)
     bar_sektor.update_layout(xaxis_title='', yaxis_title='',
                              xaxis={'visible': False},
+                             yaxis={'categoryorder': "total ascending"},
                              title={
                                  'x': 0.5,
                                  'font_size': 24
                              },
                              autosize=True, showlegend=False)
-    st.plotly_chart(bar_sektor)
-    st.dataframe(data_sektor_awal)
+    with chart_container(data_sektor_awal):
+        st.plotly_chart(bar_sektor)
 
+    st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
+                unsafe_allow_html=True)
+# JENIS PAJAK
+    jenis_pajak = prep.jenis_pajak(filter)
+    jenis_pajak9 = jenis_pajak.nlargest(10, 'NETTO')
+    jenis_pajak_lain = jenis_pajak[~jenis_pajak['MAP'].isin(
+        jenis_pajak9['MAP'])]
+    jenis_pajak_lain = pd.DataFrame(
+        [['LAINNYA', jenis_pajak_lain['NETTO'].sum()]], columns=['MAP', 'NETTO'])
+    jenis_pajak_bar = pd.concat(
+        [jenis_pajak9, jenis_pajak_lain], axis=0, ignore_index=True)
+
+    jenis_pajak_bar['text'] = jenis_pajak_bar['NETTO'].apply(
+        lambda x: '{:,.1f}M'.format(x/1000000000))
+    map_bar = px.bar(jenis_pajak_bar, x='MAP', y='NETTO',
+                     text='text', title='Per Jenis(Netto)', width=1024, height=640)
+
+    map_bar.update_layout(xaxis_title='', yaxis_title='',
+                          yaxis={'visible': False, 'minor_showgrid': False},
+                          title={
+                              'x': 0.5,
+                              'font_size': 24
+                          },
+                          autosize=True)
+    map_bar.update_traces(textfont_size=12, textangle=0,
+                          textposition="outside", cliponaxis=False)
+    with chart_container(jenis_pajak):
+        st.plotly_chart(map_bar)
+    st.markdown("""<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
+                unsafe_allow_html=True)
     data_funnel = prep.bruto(filter)
     data_funnel_chart = data_funnel.loc[:9,]
     data_funnel_chart['x'] = data_funnel_chart['BRUTO']/1000000000
     funnel_chart = px.funnel(data_funnel_chart, x='x',
-                             y='NAMA_WP', text='KONTRIBUSI', width=1280, height=640,
-                             log_x=True, title='10 WP Penyumbang Penerimaan Terbesar Bruto')
+                             y='NAMA_WP', text='KONTRIBUSI', width=1024, height=640,
+                             log_x=True, title='10 WP Terbesar Bruto')
     funnel_chart.update_traces(
         texttemplate='%{x:,.2f}M <br> (%{customdata:.2f}%)', customdata=data_funnel_chart['KONTRIBUSI'])
     funnel_chart.update_layout(xaxis_title='', yaxis_title='',
