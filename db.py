@@ -116,8 +116,22 @@ def sektor_yoy(filter, filter2):
                             columns='TAHUNBAYAR', values='NOMINAL').reset_index()
     # data.columns = [x.strip() for x in data.columns]
     data['selisih'] = data['2023']-data['2022']
-    data = data.sort_values(by='selisih', ascending=False)
+    data['tumbuh'] = (data['selisih']/data['2022'])*100
+    data = data.sort_values(by='2023', ascending=False)
     return data
+
+
+def sektor2023(filter):
+    kueri = f'''
+    SELECT 
+    p."DATEBAYAR",p."NM_KATEGORI" , sum(p."NOMINAL") AS "NOMINAL"
+    FROM 
+    ppmpkm p 
+    WHERE p."KET" !='SPMKP' and {filter}
+    GROUP BY p."DATEBAYAR",p."NM_KATEGORI" 
+    '''
+    sektor2023 = conn.query(kueri)
+    return sektor2023
 
 
 def jenis_pajak(filter):
