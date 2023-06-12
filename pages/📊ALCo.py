@@ -114,7 +114,7 @@ else:
                           '2023', '2022', 'tumbuh'])
     sektor_yoy1 = sektor_yoy[sektor_yoy['NM_KATEGORI'] != 'KLU ERROR']
     sektor_yoy['rank'] = sektor_yoy[f'{urutan}'].rank(
-        ascending=False).astype('int')
+        ascending=False)
 
     sektor_plus = sektor_yoy1[sektor_yoy1['selisih'] > 0]
     sektor_plus['rank'] = sektor_plus[f'{urutan}'].rank(ascending=False)
