@@ -160,4 +160,5 @@ else:
 
     with st.expander('Detail Data'):
         sektor_yoy.sort_values(by='rank', ascending=True, inplace=True)
-        st.dataframe(sektor_yoy)
+        with chart_container(sektor_yoy):
+            st.dataframe(sektor_yoy)

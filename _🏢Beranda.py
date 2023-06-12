@@ -96,7 +96,7 @@ with open('.streamlit/login.yaml') as file:
 names = passw.names()
 usernames = passw.usernames()
 
-hashed_password = passw.load_pass()
+
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],

@@ -17,3 +17,18 @@ linechart.update_layout(xaxis_title='', yaxis_title='',
 
 with chart_container(renpen_realisasi):
     st.plotly_chart(linechart)
+
+
+## HOUSEHOLD CORPORATE
+SELECT 
+wp.JENIS_WP , sum(pp.NOMINAL) 
+FROM ppm_pkm pp
+LEFT JOIN ( 
+		SELECT
+		NPWP15, JENIS_WP
+		FROM 
+		registrasi.sidjp_masterfile 
+)wp
+ON pp.NPWP  = wp.NPWP15 
+WHERE pp.DATEBAYAR BETWEEN '20230401' AND  '20230431'
+GROUP BY wp.JENIS_WP 
