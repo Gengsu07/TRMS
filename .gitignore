@@ -1,3 +1,6 @@
 *.toml
 login.yaml
+secrets.tomls
 .pkl
+__pycache__
+__init__

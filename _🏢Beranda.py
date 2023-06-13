@@ -7,6 +7,8 @@ from datetime import datetime
 from datetime import date
 from dateutil.relativedelta import relativedelta
 import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import calendar
 from streamlit_extras.chart_container import chart_container
 from streamlit_extras.app_logo import add_logo
@@ -282,26 +284,43 @@ elif st.session_state['authentication_status']:
 # PERSEKTOR--------------------------------------------
     data_sektor_awal = prep.sektor(filter)
     data_sektor_awal = data_sektor_awal.groupby(
-        ['NM_KATEGORI'])['NETTO'].sum().reset_index().sort_values(by='NETTO', ascending=False)
+        ['NM_KATEGORI']).sum().reset_index().sort_values(by='NETTO', ascending=False)
+
     data_sektor9 = data_sektor_awal.nlargest(10, 'NETTO')
     data_sektor_lain = data_sektor_awal[~data_sektor_awal['NM_KATEGORI'].isin(
         data_sektor9['NM_KATEGORI'])]
     data_sektor_lain = pd.DataFrame(
-        [['LAINNYA', data_sektor_lain['NETTO'].sum()]], columns=['NM_KATEGORI', 'NETTO'])
+        [['LAINNYA', data_sektor_lain['NETTO'].sum(), data_sektor_lain['BRUTO'].sum()]], columns=['NM_KATEGORI', 'NETTO', 'BRUTO'])
     data_sektor = pd.concat(
         [data_sektor9, data_sektor_lain], axis=0, ignore_index=True)
     data_sektor['text'] = data_sektor['NETTO'].apply(
         lambda x: '{:,.1f}M'.format(x/1000000000))
-    bar_sektor = px.bar(data_sektor, y='NM_KATEGORI', x='NETTO', title="Per Sektor(Netto)", orientation='h', text='text',
-                        width=1024, height=640)
-    bar_sektor.update_layout(xaxis_title='', yaxis_title='',
-                             xaxis={'visible': False},
-                             yaxis={'categoryorder': "total ascending"},
-                             title={
-                                 'x': 0.5,
-                                 'font_size': 24
-                             },
-                             autosize=True, showlegend=False)
+
+    # bar_sektor = px.bar(data_sektor, y='NM_KATEGORI', x='NETTO', title="Per Sektor(Netto)", orientation='h', text='text',
+    #                     width=1024, height=640)
+    data_sektor.sort_values(by='BRUTO', ascending=False)
+    bar_sektor = make_subplots(rows=1, cols=2)
+
+    sektor_net = go.Bar(x=data_sektor['NETTO'],
+                        y=data_sektor['NM_KATEGORI'], name='NETTO', orientation='h', marker=dict(color='#005FAC'))
+    sektor_bruto = go.Bar(
+        x=data_sektor['BRUTO'], y=data_sektor['NM_KATEGORI'], name='BRUTO', orientation='h', marker=dict(color='#ffc91b'))
+    sektor_bar = make_subplots(rows=1, cols=2, shared_yaxes=True)
+    sektor_bar.add_trace(sektor_net, row=1, col=1)
+    sektor_bar.add_trace(sektor_bruto, row=1, col=2)
+    sektor_bar.update_layout(height=640, width=1024,
+                             title_text="Sektor")
+
+    # bar_sektor.update_layout(height=640, width=1024, title_text="Sektor", xaxis_title='', yaxis_title='',
+    #                          xaxis={'visible': False},
+    #                          yaxis={'categoryorder': "total ascending"},
+    #                          title={
+    #                              'x': 0.5,
+    #                              'font_size': 24
+    #                          },
+    #                          autosize=True, showlegend=False)
+
+    st.plotly_chart(sektor_bar)
     with chart_container(data_sektor_awal):
         st.plotly_chart(bar_sektor)
 
@@ -320,6 +339,7 @@ elif st.session_state['authentication_status']:
 
     jenis_pajak_bar['text'] = jenis_pajak_bar['NETTO'].apply(
         lambda x: '{:,.1f}M'.format(x/1000000000))
+
     map_bar = px.bar(jenis_pajak_bar, x='MAP', y='NETTO',
                      text='text', title='Per Jenis(Netto)', width=1024, height=640)
 

@@ -2,9 +2,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
 import streamlit as st
-# password = quote_plus('kwl@110')
-# postgres = create_engine(
-#     f'postgresql+psycopg2://oc:{password}@10.20.254.228:5432/penerimaan')
+
 conn = st.experimental_connection('ppmpkm', type='sql')
 dict_sektor = {
     'PERDAGANGAN BESAR DAN ECERAN; REPARASI DAN PERAWATAN MOBIL DAN SEPEDA MOTOR': 'PERDAGANGAN BESAR ECERAN<br>REPARASI PERAWATAN MOBIL',
@@ -74,7 +72,7 @@ def bruto(filter):
 def sektor(filter):
     data_sektor = conn.query(f'''
         SELECT 
-        kat."NM_KATEGORI", kat."NETTO",sum(kat."BRUTO")
+        kat."NM_KATEGORI", kat."NETTO",sum(kat."BRUTO") as "BRUTO"
         FROM (
                 SELECT 
                 p."NM_KATEGORI" , 
