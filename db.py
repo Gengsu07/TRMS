@@ -175,3 +175,36 @@ def jenis_pajak(filter, filter22):
     # jenis.drop(columns="index", inplace=True)
 
     return jenis
+
+
+def kpi(filter, filter22):
+    mpn23 = conn.query(
+        f"""select 
+                sum( case when p."KET"!='SPMKP' then p."NOMINAL" END) as "BRUTO" ,
+                sum( p."NOMINAL") as "NETTO" 
+                from ppmpkm p where {filter} 
+                """
+    )
+    mpn22 = conn.query(
+        f"""select
+                sum( case when p."KET"!='SPMKP' then p."NOMINAL" END) as "BRUTO" ,
+                sum( p."NOMINAL") as "NETTO" 
+                from ppmpkm p where {filter22}
+                """
+    )
+    return [mpn23, mpn22]
+
+
+def linedata(filter, filter22):
+    linedata = conn.query(
+        f"""select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
+                where {filter}
+                GROUP BY p."BULANBAYAR",p."TAHUNBAYAR"
+                UNION ALL
+                select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
+                where {filter22}
+                GROUP BY p."BULANBAYAR" ,p."TAHUNBAYAR"
+                """
+    )
+    linedata["TAHUNBAYAR"] = linedata["TAHUNBAYAR"].astype("str")
+    return linedata

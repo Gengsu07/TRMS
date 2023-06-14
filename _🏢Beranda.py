@@ -77,21 +77,20 @@ def cek_filter(start, end, kpp, map, sektor, segmen):
 
 def data_ket(filter, filter22):
     ket = conn.query(
-        f"""select p."KET",
-    sum(case when p."TAHUNBAYAR" =2023 then p."NOMINAL" end ) as "2023"
+        f"""select p."KET",abs(
+    sum(case when p."TAHUNBAYAR" =2023 then p."NOMINAL" end )) as "2023"
     from ppmpkm p
     where {filter}
     GROUP BY p."KET"     """
     )
 
     ket22 = conn.query(
-        f"""select p."KET",
-    sum(case when p."TAHUNBAYAR" =2022 then p."NOMINAL" end ) as "2022"
+        f"""select p."KET",abs(
+    sum(case when p."TAHUNBAYAR" =2022 then p."NOMINAL" end )) as "2022"
     from ppmpkm p
     where {filter22}
     GROUP BY p."KET"     """
     )
-
     ketgab = ket.merge(ket22, on="KET", how="left")
     ketgab["selisih"] = ketgab["2023"] - ketgab["2022"]
     return ketgab
@@ -149,31 +148,101 @@ elif st.session_state["authentication_status"]:
     filter = "and".join(x for x in filter_gabungan[0])
     filter22 = "and".join(x for x in filter_gabungan[1])
 
-    # linechart--------------------
-    linedata = conn.query(
-        f"""select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
-                where {filter}
-                GROUP BY p."BULANBAYAR",p."TAHUNBAYAR"
-                UNION ALL
-                select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
-                where {filter22}
-                GROUP BY p."BULANBAYAR" ,p."TAHUNBAYAR"
-                """
+    # KPI-----------------------------------------------------------------------------------
+    style_metric_cards(
+        background_color="#FFFFFF", border_color="#005FAC", border_left_color="#005FAC"
     )
-    linedata["TAHUNBAYAR"] = linedata["TAHUNBAYAR"].astype("str")
+    data_kpi = prep.kpi(filter, filter22)
+    data23, data22 = data_kpi
+    col_tahun = st.columns(3)
+    with col_tahun[0]:
+        bruto23 = data23["BRUTO"].sum()
+        bruto22 = data22["BRUTO"].sum()
+        tumbuh_bruto = (bruto23 - bruto22) / bruto22
+
+        if (bruto23 / 1000000000000) > 1:
+            st.metric(
+                "Bruto",
+                "{:,.1f}T".format(bruto23 / 1000000000000),
+                delta="{:,.1f}%".format(tumbuh_bruto * 100),
+            )
+        else:
+            st.metric(
+                "Bruto",
+                "{:,.1f}M".format(bruto23 / 1000000000),
+                delta="{:,.1f}%".format(tumbuh_bruto * 100),
+            )
+    with col_tahun[1]:
+        net23 = data23["NETTO"].sum()
+        net22 = data22["NETTO"].sum()
+        tumbuh_net = (net23 - net22) / net22
+
+        if (net23 / 1000000000000) > 1:
+            st.metric(
+                "Netto",
+                "{:,.1f}T".format(net23 / 1000000000000),
+                delta="{:,.1f}%".format(tumbuh_net * 100),
+            )
+        else:
+            st.metric(
+                "Netto",
+                "{:,.1f}M".format(net23 / 1000000000),
+                delta="{:,.1f}%".format(tumbuh_net * 100),
+            )
+    # with col_tahun[2]:
+    #     net23 = data23["NETTO"].sum()
+    #     net22 = data22["NETTO"].sum()
+    #     naik_net = net23 - net22
+    #     if (naik_net) > 1000000000000:
+    #         st.metric("Kenaikan Netto", "{:,.1f}T".format(naik_net / 1000000000000))
+    #     else:
+    #         st.metric("Kenaikan Netto", "{:,.1f}M".format(naik_net / 1000000000))
+    # with col_tahun[3]:
+    #     selisih = data23 - data22
+    #     if (data22 == 0) | (selisih == 0):
+    #         tumbuh = 0
+    #     else:
+    #         tumbuh = selisih / data22
+    #     st.metric("Tumbuh", "{:.1f}%".format(tumbuh * 100))
+    with col_tahun[2]:
+        persentase23 = net23 / 27601733880000
+        persentase22 = net22 / 22656373555000
+        tumbuh_persen = persentase23 - persentase22
+        st.metric(
+            "Kontrib Target Kanwil",
+            "{:.2f}%".format(persentase23 * 100),
+            delta="{:.2f}%".format(tumbuh_persen * 100),
+        )
+
+    st.markdown(
+        """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
+        unsafe_allow_html=True,
+    )
+
+    # linechart--------------------
+    linedata = prep.linedata(filter, filter22)
     linedata = linedata.groupby(["TAHUNBAYAR", "BULANBAYAR"])["sum"].sum().reset_index()
     linedata["text"] = linedata["sum"].apply(
         lambda x: "{:,.1f}M".format(x / 1000000000)
     )
-    linechart = px.area(
+
+    linedata23 = linedata[linedata["TAHUNBAYAR"] == "2023"]
+
+    linedata23["kumulatif"] = linedata23["sum"].cumsum()
+    linedata22 = linedata[linedata["TAHUNBAYAR"] == "2022"]
+    linedata22["kumulatif"] = linedata22["sum"].cumsum()
+    linedata = pd.concat([linedata23, linedata22], axis=0, ignore_index=True)
+
+    linechart = px.bar(
         data_frame=linedata,
         x="BULANBAYAR",
         y="sum",
         color="TAHUNBAYAR",
         text="text",
-        width=1024,
         height=380,
+        barmode="group",
     )
+
     linechart.update_layout(
         xaxis_title="",
         yaxis_title="",
@@ -186,124 +255,115 @@ elif st.session_state["authentication_status"]:
         autosize=True,
     )
 
+    line = px.line(
+        linedata, x="BULANBAYAR", y="kumulatif", color="TAHUNBAYAR", height=380
+    )
+    line.update_layout(
+        xaxis_title="",
+        yaxis_title="",
+        yaxis={"visible": False},
+        xaxis={
+            "tickmode": "array",
+            "tickvals": [x for x in range(1, 13)],
+            "ticktext": [calendar.month_name[i] for i in range(1, 13)],
+        },
+        autosize=True,
+    )
     with chart_container(linedata):
-        st.plotly_chart(linechart, use_container_width=True)
+        timeseries = st.columns(2)
+        with timeseries[0]:
+            st.plotly_chart(linechart, use_container_width=True)
+        with timeseries[1]:
+            st.plotly_chart(line, use_container_width=True)
 
-    # KPI-----------------------------------------------------------------------------------
-    style_metric_cards(
-        background_color="#FFFFFF", border_color="#ffc91b", border_left_color="#ffc91b"
-    )
-    col_tahun = st.columns(5)
-    with col_tahun[0]:
-        if filter:
-            data23 = conn.query(f'select sum("NOMINAL") from ppmpkm p where {filter}')[
-                "sum"
-            ].sum()
-        else:
-            data23 = conn.query(
-                f"""select sum("NOMINAL") from ppmpkm p where {filter_gabungan[0][0] +'and'+ filter_gabungan[0][1]} """
-            )["sum"].sum()
-        if (data23 / 1000000000000) > 1:
-            st.metric("2023", "{:,.1f}T".format(data23 / 1000000000000))
-        else:
-            st.metric("2023", "{:,.1f}M".format(data23 / 1000000000))
-    with col_tahun[1]:
-        if filter:
-            data22 = conn.query(
-                f'select sum("NOMINAL") from ppmpkm p where {filter22}'
-            )["sum"].sum()
-        else:
-            data22 = conn.query(
-                f"""select sum("NOMINAL") from ppmpkm p where {filter_gabungan[1][0] +'and'+ filter_gabungan[1][1]} """
-            )["sum"].sum()
-        if (data22 / 1000000000000) > 1:
-            st.metric("2022", "{:,.1f}T".format(data22 / 1000000000000))
-        else:
-            st.metric("2022", "{:,.1f}M".format(data22 / 1000000000))
-    with col_tahun[2]:
-        selisih = data23 - data22
-        if (selisih) > 1000000000000:
-            st.metric("Kenaikan", "{:,.1f}T".format(selisih / 1000000000000))
-        else:
-            st.metric("Kenaikan", "{:,.1f}M".format(selisih / 1000000000))
-    with col_tahun[3]:
-        selisih = data23 - data22
-        if (data22 == 0) | (selisih == 0):
-            tumbuh = 0
-        else:
-            tumbuh = selisih / data22
-        st.metric("Tumbuh", "{:.1f}%".format(tumbuh * 100))
-    with col_tahun[4]:
-        persentase = data23 / 27601733880000
-        st.metric("Kontrib Target Kanwil", "{:.2f}%".format(persentase * 100))
-
-    st.markdown(
-        """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
-        unsafe_allow_html=True,
-    )
-
-    # KET-------------------------------------------------
+    # KET-----------------------------------------------------------------------
     ket = data_ket(filter, filter22).set_index("KET")
+
     colket = st.columns(5)
     with colket[0]:
         if "MPN" in ket.index:
-            format_number = (
-                "{:+,.1f}M" if ket.loc["MPN", "selisih"] >= 0 else "{:-,.1f}M"
-            )
+            format_number = "{:+,.1f}M" if ket.loc["MPN", "2023"] >= 0 else "{:-,.1f}M"
             format_number_T = (
-                "{:+,.1f}T" if ket.loc["MPN", "selisih"] >= 0 else "{:-,.1f}T"
+                "{:+,.1f}T" if ket.loc["MPN", "2023"] >= 0 else "{:-,.1f}T"
             )
-            if ket.loc["MPN", "selisih"] > 1000000000000:
+            if ket.loc["MPN", "2023"] > 1000000000000:
                 st.metric(
                     "MPN",
-                    format_number_T.format(ket.loc["MPN", "selisih"] / 1000000000000),
+                    format_number_T.format(ket.loc["MPN", "2023"] / 1000000000000),
+                    delta=format_number_T.format(
+                        ket.loc["MPN", "selisih"] / 1000000000000
+                    ),
                 )
             else:
                 st.metric(
-                    "MPN", format_number.format(ket.loc["MPN", "selisih"] / 1000000000)
+                    "MPN",
+                    format_number.format(ket.loc["MPN", "2023"] / 1000000000),
+                    delta=format_number_T.format(
+                        ket.loc["MPN", "2023"] / 1000000000000
+                    ),
                 )
         else:
             st.metric("MPN", "0M")
     with colket[1]:
         if "SPM" in ket.index:
-            format_number = (
-                "{:+,.1f}M" if ket.loc["SPM", "selisih"] >= 0 else "{:-,.1f}M"
-            )
+            format_number = "{:+,.1f}M" if ket.loc["SPM", "2023"] >= 0 else "{:-,.1f}M"
             st.metric(
-                "SPM", format_number.format(ket.loc["SPM", "selisih"] / 1000000000)
+                "SPM",
+                format_number.format(ket.loc["SPM", "2023"] / 1000000000),
+                delta=format_number.format(ket.loc["SPM", "selisih"] / 1000000000),
             )
         else:
             st.metric("SPM", "0.0M")
     with colket[2]:
         if "PBK KIRIM" in ket.index:
             format_number = (
-                "{:+,.1f}M" if ket.loc["PBK KIRIM", "selisih"] >= 0 else "{:-,.1f}M"
+                "{:+,.1f}M" if ket.loc["PBK KIRIM", "2023"] >= 0 else "{:-,.1f}M"
             )
             st.metric(
                 "PBK KIRIM",
-                format_number.format(ket.loc["PBK KIRIM", "selisih"] / 1000000000),
+                format_number.format(ket.loc["PBK KIRIM", "2023"] / 1000000000),
+                delta=format_number.format(ket.loc["PBK KIRIM", "2023"] / 1000000000),
             )
         else:
             st.metric("PBK KIRIM", "0.0M")
     with colket[3]:
         if "PBK TERIMA" in ket.index:
             format_number = (
-                "{:+,.1f}M" if ket.loc["PBK TERIMA", "selisih"] >= 0 else "{:-,.1f}M"
+                "{:+,.1f}M" if ket.loc["PBK TERIMA", "2023"] >= 0 else "{:-,.1f}M"
             )
             st.metric(
                 "PBK TERIMA",
-                format_number.format(ket.loc["PBK TERIMA", "selisih"] / 1000000000),
+                format_number.format(ket.loc["PBK TERIMA", "2023"] / 1000000000),
+                delta=format_number.format(
+                    ket.loc["PBK TERIMA", "selisih"] / 1000000000
+                ),
             )
         else:
             st.metric("PBK TERIMA", "0.0M")
     with colket[4]:
         if "SPMKP" in ket.index:
             format_number = (
-                "{:+,.1f}M" if ket.loc["SPMKP", "selisih"] >= 0 else "{:-,.1f}M"
+                "{:+,.1f}M" if ket.loc["SPMKP", "2023"] >= 0 else "{:-,.1f}M"
             )
-            st.metric(
-                "SPMKP", format_number.format(ket.loc["SPMKP", "selisih"] / 1000000000)
+            format_number_T = (
+                "{:+,.1f}T" if ket.loc["SPMKP", "2023"] >= 0 else "{:-,.1f}T"
             )
+            if ket.loc["SPMKP", "2023"] > 1000000000000:
+                st.metric(
+                    "SPMKP",
+                    format_number_T.format(ket.loc["SPMKP", "2023"] / 1000000000000),
+                    delta=format_number.format(
+                        ket.loc["SPMKP", "selisih"] / 1000000000
+                    ),
+                )
+            else:
+                st.metric(
+                    "SPMKP",
+                    format_number.format(ket.loc["SPMKP", "2023"] / 1000000000),
+                    delta=format_number.format(
+                        ket.loc["SPMKP", "selisih"] / 1000000000
+                    ),
+                )
         else:
             st.metric("SPMKP", "0.0M")
 
@@ -383,31 +443,10 @@ elif st.session_state["authentication_status"]:
     sektor_data = [sektor_net, sektor_bruto]
     sektor_layout = go.Layout(barmode="stack")
     sektor_bar = go.Figure(data=sektor_data, layout=sektor_layout)
-    # sektor_kontrib = go.Funnel(
-    #     x=data_sektor["kontribusi"],
-    #     y=data_sektor["NM_KATEGORI"],
-    #     name="BRUTO",
-    #     text=data_sektor["kontrib_persen"],
-    #     marker=dict(color="#005FAC"),
-    #     textangle=0,
-    #     textposition="inside",
-    # )
-
-    # sektor_bar = make_subplots(
-    #     rows=1,
-    #     cols=2,
-    #     shared_yaxes=True,
-    #     subplot_titles=[f"Neto:{netto_val}", f"Bruto:{bruto_val}"],
-    # )
-
-    # sektor_bar.add_trace(sektor_net)
-    # sektor_bar.add_trace(sektor_bruto)
-    # sektor_bar.add_trace(sektor_kontrib, row=1, col=3)
 
     sektor_bar.update_layout(
         barmode="stack",
         height=720,
-        width=1024,
         title=dict(text="Per Sektor", x=0.5, y=0.95, font=dict(size=26)),
         showlegend=True,
         font=dict(
@@ -418,9 +457,6 @@ elif st.session_state["authentication_status"]:
     )
 
     sektor_bar.update_xaxes(visible=False)
-
-    with chart_container(data_sektor_awal):
-        st.plotly_chart(sektor_bar, use_container_width=True)
 
     st.markdown(
         """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
@@ -447,31 +483,54 @@ elif st.session_state["authentication_status"]:
     jenis_pajak9 = jenis_pajak9.assign(
         tbruto=jenis_pajak["BRUTO"].apply(lambda x: "{:,.1f}M".format(x / 1000000000)),
     )
-    map_bar = px.bar(
-        jenis_pajak9,
-        x="MAP",
-        y="BRUTO",
-        color="TAHUNBAYAR",
-        text="tbruto",
-        title="Per Jenis(Bruto)",
-        width=1024,
-        height=640,
-        color_discrete_sequence=["#ffc91b", "#005FAC"],
-        barmode="group",
-    )
 
-    map_bar.update_layout(
-        xaxis_title="",
-        yaxis_title="",
-        yaxis={"visible": False, "minor_showgrid": False},
-        title={"x": 0.5, "font_size": 24},
-        autosize=True,
+    jenis_pajak9_23 = jenis_pajak9[jenis_pajak9["TAHUNBAYAR"] == "2023"].sort_values(
+        by="BRUTO", ascending=True
     )
-    map_bar.update_traces(
-        textfont_size=12, textangle=0, textposition="outside", cliponaxis=False
+    mapbar23 = go.Bar(
+        x=jenis_pajak9_23["BRUTO"],
+        y=jenis_pajak9_23["MAP"],
+        name="2023",
+        orientation="h",
+        text=jenis_pajak9_23["tbruto"],
+        textposition="outside",
+        marker=dict(color="#005FAC"),
     )
-    with chart_container(jenis_pajak):
-        st.plotly_chart(map_bar, use_container_width=True)
+    jenis_pajak9_22 = jenis_pajak9[jenis_pajak9["TAHUNBAYAR"] == "2022"].sort_values(
+        by="BRUTO", ascending=True
+    )
+    mapbar22 = go.Bar(
+        x=jenis_pajak9_22["BRUTO"],
+        y=jenis_pajak9_22["MAP"],
+        name="2022",
+        orientation="h",
+        base=0,
+        width=0.3,
+        marker=dict(color="#ffc91b"),
+    )
+    data_map = [mapbar23, mapbar22]
+    map_layout = go.Layout(
+        barmode="stack",
+        height=720,
+        xaxis=dict(visible=False),
+        title=dict(text="Per Jenis", x=0.5, y=0.95, font=dict(size=26)),
+        showlegend=False,
+        font=dict(
+            family="Arial",
+            size=12,
+            color="#333333",
+        ),
+    )
+    mapchart = go.Figure(data=data_map, layout=map_layout)
+
+    colgab = st.columns(2)
+    with colgab[0]:
+        with chart_container(data_sektor_awal):
+            st.plotly_chart(sektor_bar, use_container_width=True)
+    with colgab[1]:
+        with chart_container(jenis_pajak):
+            st.plotly_chart(mapchart, use_container_width=True)
+
     st.markdown(
         """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
         unsafe_allow_html=True,
@@ -487,15 +546,21 @@ elif st.session_state["authentication_status"]:
         width=1024,
         height=640,
         log_x=True,
+        color="x",
         title="10 WP Terbesar Bruto",
+        template="ggplot2",
     )
     funnel_chart.update_traces(
         texttemplate="%{x:,.2f}M <br> (%{customdata:.2f}%)",
         customdata=data_funnel_chart["KONTRIBUSI"],
     )
     funnel_chart.update_layout(
-        xaxis_title="", yaxis_title="", title={"x": 0.5, "font_size": 24}, autosize=True
+        xaxis_title="",
+        yaxis_title="",
+        title={"x": 0.5, "font_size": 24},
+        autosize=True,
+        showlegend=False,
     )
 
     with chart_container(data_funnel):
-        st.plotly_chart(funnel_chart)
+        st.plotly_chart(funnel_chart, use_container_width=True)
