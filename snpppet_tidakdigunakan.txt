@@ -32,3 +32,69 @@ LEFT JOIN (
 ON pp.NPWP  = wp.NPWP15 
 WHERE pp.DATEBAYAR BETWEEN '20230401' AND  '20230431'
 GROUP BY wp.JENIS_WP 
+
+
+
+sektor_bruto = go.Bar(
+        x=data_sektor["BRUTO"],
+        y=data_sektor["NM_KATEGORI"],
+        name="BRUTO",
+        orientation="h",
+        text=data_sektor["bruto_text"],
+        marker=dict(color="#ffc91b"),
+        textangle=0,
+        textposition="auto",
+    )
+
+    sektor_net = go.Bar(
+        x=data_sektor["NETTO"],
+        y=data_sektor["NM_KATEGORI"],
+        name="NETTO",
+        orientation="h",
+        text=data_sektor["net_text"],
+        marker=dict(color="#005FAC"),
+        textangle=0,
+    )
+
+    # sektor_kontrib = go.Funnel(
+    #     x=data_sektor["kontribusi"],
+    #     y=data_sektor["NM_KATEGORI"],
+    #     name="BRUTO",
+    #     text=data_sektor["kontrib_persen"],
+    #     marker=dict(color="#005FAC"),
+    #     textangle=0,
+    #     textposition="inside",
+    # )
+
+    sektor_bar = make_subplots(
+        rows=1,
+        cols=2,
+        shared_yaxes=True,
+        subplot_titles=[f"Neto:{netto_val}", f"Bruto:{bruto_val}"],
+    )
+
+    sektor_bar.add_trace(sektor_net, row=1, col=1)
+    sektor_bar.add_trace(sektor_bruto, row=1, col=2)
+    # sektor_bar.add_trace(sektor_kontrib, row=1, col=3)
+
+
+
+    data_sektor_awal = prep.sektor(filter)
+    data_sektor_awal = (
+        data_sektor_awal.groupby(["NM_KATEGORI"])
+        .sum()
+        .reset_index()
+        .sort_values(by="NETTO", ascending=False)
+        .reset_index()
+        .drop(columns="index")
+    )
+
+    data_sektor9 = data_sektor_awal.nlargest(10, "NETTO")
+    data_sektor_lain = data_sektor_awal[
+        ~data_sektor_awal["NM_KATEGORI"].isin(data_sektor9["NM_KATEGORI"])
+    ]
+    data_sektor_lain = pd.DataFrame(
+        [["LAINNYA", data_sektor_lain["NETTO"].sum(), data_sektor_lain["BRUTO"].sum()]],
+        columns=["NM_KATEGORI", "NETTO", "BRUTO"],
+    )
+    data_sektor = pd.concat([data_sektor9, data_sektor_lain], axis=0, ignore_index=True)
