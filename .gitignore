@@ -3,5 +3,6 @@
 login.yaml
 secrets.toml
 .pkl
+snippets.py
 __pycache__
 __init__
