@@ -1,7 +1,7 @@
 .streamlit
 *.toml
 login.yaml
-secrets.tomls
+secrets.toml
 .pkl
 __pycache__
 __init__
