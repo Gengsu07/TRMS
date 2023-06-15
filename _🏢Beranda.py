@@ -545,10 +545,21 @@ elif st.session_state["authentication_status"]:
         text="KONTRIBUSI",
         width=1024,
         height=640,
-        log_x=True,
+        log_x=False,
         color="x",
         title="10 WP Terbesar Bruto",
-        template="ggplot2",
+        color_discrete_sequence=[
+            "#08306b",
+            "#08519c",
+            "#2171b5",
+            "#4292c6",
+            "#6baed6",
+            "#9ecae1",
+            "#c6dbef",
+            "#deebf7",
+            "#ebf3fb",
+            "#f7fbff",
+        ],
     )
     funnel_chart.update_traces(
         texttemplate="%{x:,.2f}M <br> (%{customdata:.2f}%)",
@@ -564,3 +575,10 @@ elif st.session_state["authentication_status"]:
 
     with chart_container(data_funnel):
         st.plotly_chart(funnel_chart, use_container_width=True)
+
+    # TOP10-----------------------------------------------------------------------------------
+    topwp, botwp = prep.naikturun(filter, filter22)
+    st.dataframe(topwp)
+    st.dataframe(botwp)
+    # cek = prep.naikturun(filter, filter22)
+    # st.write(cek)

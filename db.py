@@ -208,3 +208,48 @@ def linedata(filter, filter22):
     )
     linedata["TAHUNBAYAR"] = linedata["TAHUNBAYAR"].astype("str")
     return linedata
+
+
+def naikturun(filter, filter22):
+    kueri = f""" 
+     SELECT
+	p."NPWP",
+	p."NAMA_WP",
+    p."TAHUNBAYAR",
+	SUM (p."NOMINAL") AS "NOMINAL"
+    FROM
+        ppmpkm p
+    WHERE
+        p."KET" !='SPMKP' AND {filter}
+    GROUP BY
+        p."NPWP",
+        p."NAMA_WP",
+        p."TAHUNBAYAR"
+    UNION ALL
+         SELECT
+	p."NPWP",
+	p."NAMA_WP",
+    p."TAHUNBAYAR",
+	SUM (p."NOMINAL") AS "NOMINAL"
+    FROM
+        ppmpkm p
+    WHERE
+        p."KET" !='SPMKP' AND {filter22}
+    GROUP BY
+        p."NPWP",
+        p."NAMA_WP",
+        p."TAHUNBAYAR"
+        """
+    data = conn.query(kueri)
+    data = (
+        data.groupby(["NPWP", "NAMA_WP", "TAHUNBAYAR"])["NOMINAL"].sum().reset_index()
+    )
+    data = data.pivot_table(
+        index=["NPWP", "NAMA_WP"], columns="TAHUNBAYAR", values="NOMINAL"
+    ).reset_index()
+    data.columns = [x.strip() for x in data.columns]
+    data["2022"] = data["2022"].fillna(0).astype("int")
+    data["SELISIH"] = data["2023"] - data["2022"]
+    top10 = data.nlargest(10, "SELISIH")
+    bot10 = data.nsmallest(10, "SELISIH")
+    return [top10, bot10]
