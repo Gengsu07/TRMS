@@ -16,6 +16,8 @@ from yaml.loader import SafeLoader
 import yaml
 import streamlit_authenticator as stauth
 import streamlit as st
+from streamlit_lottie import st_lottie_spinner, st_lottie
+import json
 
 st.set_page_config(
     page_title="Tax Revenue Monitoring Sistem", page_icon="🚀", layout="wide"
@@ -118,12 +120,11 @@ elif st.session_state["authentication_status"] is None:
     st.warning("Masukan username dan password yang sesuai")
 elif st.session_state["authentication_status"]:
     # Sidebar----------------------------------------------------------------------------
-
     with st.sidebar:
         if st.session_state["authentication_status"]:
             authenticator.logout("Logout", "sidebar")
             st.text(f"Salam Satu Bahu: {name}")
-        add_logo("unit.png", height=150)
+        add_logo("assets/unit.png", height=150)
         mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
         start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
         end = st.date_input("Tgl Akhir", max_value=date.today())
@@ -150,12 +151,15 @@ elif st.session_state["authentication_status"]:
 
     # KPI-----------------------------------------------------------------------------------
     style_metric_cards(
-        background_color="#FFFFFF", border_color="#005FAC", border_left_color="#005FAC"
+        background_color="#FFFFFF",
+        border_color="#005FAC",
+        border_left_color="#005FAC",
     )
     data_kpi = prep.kpi(filter, filter22)
     data23, data22 = data_kpi
-    col_tahun = st.columns(3)
-    with col_tahun[0]:
+    col_tahun = st.columns(4)
+
+    with col_tahun[1]:
         bruto23 = data23["BRUTO"].sum()
         bruto22 = data22["BRUTO"].sum()
         tumbuh_bruto = (bruto23 - bruto22) / bruto22
@@ -172,7 +176,7 @@ elif st.session_state["authentication_status"]:
                 "{:,.1f}M".format(bruto23 / 1000000000),
                 delta="{:,.1f}%".format(tumbuh_bruto * 100),
             )
-    with col_tahun[1]:
+    with col_tahun[2]:
         net23 = data23["NETTO"].sum()
         net22 = data22["NETTO"].sum()
         tumbuh_net = (net23 - net22) / net22
@@ -204,7 +208,7 @@ elif st.session_state["authentication_status"]:
     #     else:
     #         tumbuh = selisih / data22
     #     st.metric("Tumbuh", "{:.1f}%".format(tumbuh * 100))
-    with col_tahun[2]:
+    with col_tahun[3]:
         persentase23 = net23 / 27601733880000
         persentase22 = net22 / 22656373555000
         tumbuh_persen = persentase23 - persentase22
@@ -367,11 +371,6 @@ elif st.session_state["authentication_status"]:
         else:
             st.metric("SPMKP", "0.0M")
 
-    st.markdown(
-        """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
-        unsafe_allow_html=True,
-    )
-
     # PERSEKTOR-------------------------------------------------------------------------------
 
     data_sektor_awal = prep.sektor_yoy(filter, filter22)
@@ -472,14 +471,7 @@ elif st.session_state["authentication_status"]:
     map_pivot = map_pivot.nlargest(10, "2023")
 
     jenis_pajak9 = jenis_pajak[jenis_pajak["MAP"].isin(map_pivot.index)]
-    # jenis_pajak_lain = jenis_pajak[~jenis_pajak["MAP"].isin(jenis_pajak9["MAP"])]
-    # jenis_pajak_lain = pd.DataFrame(
-    #     [["LAINNYA", jenis_pajak_lain["BRUTO"].sum(), jenis_pajak_lain["2023"].sum()]],
-    #     columns=["MAP", "2022", "2023"],
-    # )
-    # jenis_pajak_bar = pd.concat(
-    #     [jenis_pajak9, jenis_pajak_lain], axis=0, ignore_index=True
-    # )
+
     jenis_pajak9 = jenis_pajak9.assign(
         tbruto=jenis_pajak["BRUTO"].apply(lambda x: "{:,.1f}M".format(x / 1000000000)),
     )
@@ -535,50 +527,179 @@ elif st.session_state["authentication_status"]:
         """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
         unsafe_allow_html=True,
     )
-    data_funnel = prep.bruto(filter)
-    data_funnel_chart = data_funnel.loc[:9,]
-    data_funnel_chart["x"] = data_funnel_chart["BRUTO"] / 1000000000
-    funnel_chart = px.funnel(
-        data_funnel_chart,
-        x="x",
-        y="NAMA_WP",
-        text="KONTRIBUSI",
-        width=1024,
-        height=640,
-        log_x=False,
-        color="x",
-        title="10 WP Terbesar Bruto",
-        color_discrete_sequence=[
-            "#08306b",
-            "#08519c",
-            "#2171b5",
-            "#4292c6",
-            "#6baed6",
-            "#9ecae1",
-            "#c6dbef",
-            "#deebf7",
-            "#ebf3fb",
-            "#f7fbff",
-        ],
-    )
-    funnel_chart.update_traces(
-        texttemplate="%{x:,.2f}M <br> (%{customdata:.2f}%)",
-        customdata=data_funnel_chart["KONTRIBUSI"],
-    )
-    funnel_chart.update_layout(
-        xaxis_title="",
-        yaxis_title="",
-        title={"x": 0.5, "font_size": 24},
-        autosize=True,
-        showlegend=False,
-    )
-
-    with chart_container(data_funnel):
-        st.plotly_chart(funnel_chart, use_container_width=True)
 
     # TOP10-----------------------------------------------------------------------------------
     topwp, botwp = prep.naikturun(filter, filter22)
-    st.dataframe(topwp)
-    st.dataframe(botwp)
-    # cek = prep.naikturun(filter, filter22)
-    # st.write(cek)
+
+    topwp.iloc[:, 2:] = (topwp.iloc[:, 2:] / 1000000000).applymap(
+        lambda x: "{:,.1f}".format(x)
+    )
+
+    botwp.iloc[:, 2:] = (botwp.iloc[:, 2:] / 1000000000).applymap(
+        lambda x: "{:,.1f}".format(x)
+    )
+
+    with st.container():
+        tab_wp = st.tabs(["Top 10 WP", "Top 10 Tumbuh", "Bottom 10 WP Tumbuh"])
+        with tab_wp[0]:
+            data_proporsi = prep.proporsi(filter)
+            with chart_container(data_proporsi):
+                # PROPORSI--------------------------------------------------------------------
+                data_proporsi = data_proporsi.iloc[:10,]
+                proporsi_chart = go.Figure(
+                    go.Funnel(
+                        y=data_proporsi["NAMA_WP"],
+                        x=data_proporsi["BRUTO"] / 1000000000,
+                        textposition="inside",
+                        # textinfo="value+percent initial",
+                        text=data_proporsi["KONTRIBUSI"],
+                        texttemplate="%{x:,.1f}M <br> %{text:.1%}",
+                        opacity=1,
+                        marker={
+                            "color": [
+                                "#005fac",
+                                "#1473af",
+                                "#2888b1",
+                                "#3a9db4",
+                                "#4cb3b7",
+                                "#5ec8ba",
+                                "#70debd",
+                                "#82f3c0",
+                                "#95f8c3",
+                                "#a9fed0",
+                            ],
+                            "line": {
+                                "width": [4, 2, 2, 3, 1, 1],
+                                "color": ["white"] * 10,
+                            },
+                        },
+                        connector={
+                            "line": {
+                                "color": "royalblue",
+                                "dash": "dot",
+                                "width": 3,
+                            }
+                        },
+                    )
+                )
+                proporsi_chart.update_layout(
+                    height=640,
+                    title=dict(
+                        text="10 WP Terbesar Bruto",
+                        x=0.5,
+                        y=0.95,
+                        font=dict(size=26),
+                    ),
+                )
+                st.plotly_chart(proporsi_chart, use_container_width=True)
+        with tab_wp[1]:
+            with chart_container(topwp):
+                table_top = go.Figure(
+                    data=[
+                        go.Table(
+                            columnorder=[1, 2, 3, 4, 5],
+                            columnwidth=[40, 100, 30, 30, 30],
+                            header=dict(
+                                values=[
+                                    ["<b>NPWP</b>"],
+                                    ["<b>NAMA WP</b>"],
+                                    ["<b>2022(M)</b>"],
+                                    ["<b>2023(M)</b>"],
+                                    ["<b>SELISIH(M)</b>"],
+                                ],
+                                fill_color="#005FAC",
+                                line_color="gray",
+                                align=[
+                                    "center",
+                                    "center",
+                                    "center",
+                                    "center",
+                                    "center",
+                                ],
+                                font=dict(color="white", size=16),
+                                height=40,
+                            ),
+                            cells=dict(
+                                values=[topwp[x] for x in topwp.columns],
+                                fill=dict(
+                                    color=[
+                                        "paleturquoise",
+                                        "paleturquoise",
+                                        "white",
+                                        "white",
+                                        "white",
+                                    ]
+                                ),
+                                line_color="darkslategray",
+                                align=[
+                                    "left",
+                                    "left",
+                                    "center",
+                                    "center",
+                                    "center",
+                                ],
+                                font_size=14,
+                                height=30,
+                            ),
+                        )
+                    ]
+                )
+                table_top.update_layout(
+                    height=640,
+                    width=960,
+                    title=dict(
+                        text="10 Tumbuh Terbesar Bruto",
+                        x=0.5,
+                        y=0.95,
+                        font=dict(size=26),
+                    ),
+                )
+                st.plotly_chart(table_top, use_container_width=True)
+        with tab_wp[2]:
+            table_bot = go.Figure(
+                data=[
+                    go.Table(
+                        columnorder=[1, 2, 3, 4, 5],
+                        columnwidth=[40, 100, 30, 30, 30],
+                        header=dict(
+                            values=[
+                                ["<b>NPWP</b>"],
+                                ["<b>NAMA WP</b>"],
+                                ["<b>2022(M)</b>"],
+                                ["<b>2023(M)</b>"],
+                                ["<b>SELISIH(M)</b>"],
+                            ],
+                            fill_color="#f07167",
+                            line_color="gray",
+                            align=[
+                                "center",
+                                "center",
+                                "center",
+                                "center",
+                                "center",
+                            ],
+                            font=dict(color="white", size=16),
+                            height=40,
+                        ),
+                        cells=dict(
+                            values=[botwp[x] for x in botwp.columns],
+                            fill=dict(
+                                color=[
+                                    "#fbc4ab",
+                                    "#fbc4ab",
+                                    "white",
+                                    "white",
+                                    "white",
+                                ]
+                            ),
+                            line_color="gray",
+                            align=["left", "left", "center", "center", "center"],
+                            font_size=14,
+                            height=30,
+                        ),
+                    )
+                ]
+            )
+            table_bot.update_layout(height=640, width=1024)
+            with chart_container(botwp):
+                st.plotly_chart(table_bot, use_container_width=True)

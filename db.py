@@ -241,15 +241,65 @@ def naikturun(filter, filter22):
         p."TAHUNBAYAR"
         """
     data = conn.query(kueri)
-    data = (
-        data.groupby(["NPWP", "NAMA_WP", "TAHUNBAYAR"])["NOMINAL"].sum().reset_index()
-    )
+    data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
+    # data = (
+    #     data.groupby(["NPWP", "NAMA_WP", "TAHUNBAYAR"])["NOMINAL"].sum().reset_index()
+    # )
     data = data.pivot_table(
         index=["NPWP", "NAMA_WP"], columns="TAHUNBAYAR", values="NOMINAL"
     ).reset_index()
-    data.columns = [x.strip() for x in data.columns]
-    data["2022"] = data["2022"].fillna(0).astype("int")
+
     data["SELISIH"] = data["2023"] - data["2022"]
     top10 = data.nlargest(10, "SELISIH")
     bot10 = data.nsmallest(10, "SELISIH")
     return [top10, bot10]
+
+
+def proporsi(filter):
+    kueri = f""" 
+    select 
+    p."NPWP",
+    p."NAMA_WP" , 
+    sum(p."NOMINAL") as "BRUTO"
+    from ppmpkm p 
+    where p."KET" != 'SPMKP' and {filter}
+    group by p."NPWP" ,p."NAMA_WP" 
+    order by "BRUTO" desc
+    """
+    bruto = conn.query(kueri)
+    # bruto_nol = bruto[bruto['NPWP'].str.startswith('00000000')]
+    row = bruto.shape[0] + 1
+    # rowplus = row-len(brutomin)
+
+    bruto_a = bruto.nlargest(10, columns="BRUTO")
+    bruto_b = pd.DataFrame(
+        [["Penerimaan 10 WP Terbesar", bruto_a["BRUTO"].sum()]],
+        columns=["NAMA_WP", "BRUTO"],
+    )
+    bruto_c = pd.DataFrame(
+        [["Penerimaan 11 s.d. 100 WP Terbesar", bruto.iloc[10:100,]["BRUTO"].sum()]],
+        columns=["NAMA_WP", "BRUTO"],
+    )
+    bruto_d = pd.DataFrame(
+        [["Penerimaan 101 s.d. 500 WP Terbesar", bruto.iloc[100:500,]["BRUTO"].sum()]],
+        columns=["NAMA_WP", "BRUTO"],
+    )
+    bruto_e = pd.DataFrame(
+        [
+            [
+                "Penerimaan 501 s.d. {} WP Terbesar".format(row),
+                bruto.iloc[500:row,]["BRUTO"].sum(),
+            ]
+        ],
+        columns=["NAMA_WP", "BRUTO"],
+    )
+    bruto_g = pd.DataFrame(
+        [["Total", bruto["BRUTO"].sum()]], columns=["NAMA_WP", "BRUTO"]
+    )
+    bruto_ok = pd.concat(
+        [bruto_a, bruto_b, bruto_c, bruto_d, bruto_e, bruto_g],
+        axis=0,
+        ignore_index=True,
+    )
+    bruto_ok["KONTRIBUSI"] = bruto_ok["BRUTO"] / bruto["BRUTO"].sum()
+    return bruto_ok
