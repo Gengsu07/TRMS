@@ -1,6 +1,7 @@
 import pandas as pd
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
+import calendar
 import streamlit as st
 
 conn = st.experimental_connection("ppmpkm", type="sql")
@@ -68,10 +69,6 @@ def bruto(filter):
         ],
         columns=["NAMA_WP", "BRUTO"],
     )
-    # bruto_nol= pd.DataFrame([['Penerimaan Non WP ADM',bruto_nol['BRUTO'].sum()]],columns=['NAMA_WP','BRUTO'])
-    # bruto_e = pd.DataFrame([['Penerimaan 501 s.d. {} WP Terbesar'.format(rowplus),bruto.iloc[501:min(brutomin),]['BRUTO'].sum()]],columns=['NAMA_WP','BRUTO'])
-    # bruto_f = pd.DataFrame([['Penerimaan Kurang dari 0',bruto.iloc[min(brutomin):,]['BRUTO'].sum()]],columns=['NAMA_WP','BRUTO'])
-    # bruto_x = pd.DataFrame([['{} WP Pusat dan Cabang Penerimaan 0'.format(bruto_nol),'']],columns=['NAMA_WP','bruto'])
     bruto_g = pd.DataFrame(
         [["Total", bruto["BRUTO"].sum()]], columns=["NAMA_WP", "BRUTO"]
     )
@@ -303,3 +300,49 @@ def proporsi(filter):
     )
     bruto_ok["KONTRIBUSI"] = bruto_ok["BRUTO"] / bruto["BRUTO"].sum()
     return bruto_ok
+
+
+def growth_month(filter, filter22):
+    cy_kueri = f""" 
+    SELECT
+        p."BULANBAYAR" ,
+        sum(CASE WHEN p."KET" != 'SPMKP' AND p."TAHUNBAYAR" = EXTRACT(YEAR FROM CURRENT_DATE) THEN p."NOMINAL" END) AS "CY_BRUTO",
+        sum(CASE WHEN p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE) THEN p."NOMINAL" END) AS "CY_NETTO" ,
+        abs(sum(CASE WHEN p."KET" = 'SPMKP' AND p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE) THEN p."NOMINAL" END)) AS "CY_RESTITUSI"
+    FROM
+        ppmpkm p
+    WHERE {filter} 
+    GROUP BY
+        p."BULANBAYAR"
+    """
+    py_kueri = f""" 
+         SELECT
+        p."BULANBAYAR" ,
+        sum(CASE WHEN p."KET" != 'SPMKP' AND p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE)-1 THEN p."NOMINAL" END) AS "PY_BRUTO",
+        sum(CASE WHEN p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE)-1 THEN p."NOMINAL" END) AS "PY_NETTO" ,
+        abs(sum(CASE WHEN p."KET" = 'SPMKP' AND p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE)-1 THEN p."NOMINAL" END)) AS "PY_RESTITUSI"
+    FROM
+        ppmpkm p
+    WHERE {filter22} 
+    GROUP BY
+        p."BULANBAYAR"
+    """
+
+    cy_data = conn.query(cy_kueri)
+    maks_bulan = cy_data["BULANBAYAR"].max()
+    print(maks_bulan)
+    py_data = conn.query(py_kueri)
+    data = cy_data.merge(py_data, on="BULANBAYAR", how="inner")
+    data["TUMBUH BRUTO"] = (
+        (data["CY_BRUTO"] - data["PY_BRUTO"]) / data["PY_BRUTO"]
+    ) * 100
+    data["TUMBUH NETTO"] = (
+        (data["CY_NETTO"] - data["PY_NETTO"]) / data["PY_NETTO"]
+    ) * 100
+    data["TUMBUH RESTITUSI"] = (
+        (data["CY_RESTITUSI"] - data["PY_RESTITUSI"]) / data["PY_RESTITUSI"]
+    ) * 100
+    data = data[["TUMBUH BRUTO", "TUMBUH NETTO", "TUMBUH RESTITUSI"]]
+    data = data.transpose()
+    data.columns = [calendar.month_name[i] for i in range(1, maks_bulan + 1)]
+    return data
