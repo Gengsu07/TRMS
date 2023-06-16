@@ -1,7 +1,6 @@
 import importlib
 import altair as alt
 from streamlit_extras.metric_cards import style_metric_cards
-from streamlit_extras.colored_header import colored_header
 from streamlit_extras.app_logo import add_logo
 from streamlit_extras.chart_container import chart_container
 import calendar
@@ -16,11 +15,12 @@ from yaml.loader import SafeLoader
 import yaml
 import streamlit_authenticator as stauth
 import streamlit as st
-from streamlit_lottie import st_lottie_spinner, st_lottie
-import json
+
 
 st.set_page_config(
-    page_title="Tax Revenue Monitoring Sistem", page_icon="🚀", layout="wide"
+    page_title="Tax Revenue Monitoring Sistem",
+    page_icon="assets\logo_djo.png",
+    layout="wide",
 )
 
 prep = importlib.import_module("db")
@@ -124,6 +124,8 @@ elif st.session_state["authentication_status"]:
         if st.session_state["authentication_status"]:
             authenticator.logout("Logout", "sidebar")
             st.text(f"Salam Satu Bahu: {name}")
+        # with open('assets\deep-learning.json')as dl:
+        #     animasi= json.load(dl)
         add_logo("assets/unit.png", height=150)
         mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
         start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
@@ -142,7 +144,7 @@ elif st.session_state["authentication_status"]:
         segmen = st.multiselect("SEGMENTASI", options=segmen.iloc[:, 0].tolist())
 
     # Main apps-----------------------------------------------------------------------
-    st.subheader("Tax Revenue Monitoring Sistem")
+    st.subheader("🚀Tax Revenue Monitoring Sistem")
 
     # filterdata
     filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen)
@@ -157,9 +159,9 @@ elif st.session_state["authentication_status"]:
     )
     data_kpi = prep.kpi(filter, filter22)
     data23, data22 = data_kpi
-    col_tahun = st.columns(4)
+    col_tahun = st.columns(3)
 
-    with col_tahun[1]:
+    with col_tahun[0]:
         bruto23 = data23["BRUTO"].sum()
         bruto22 = data22["BRUTO"].sum()
         tumbuh_bruto = (bruto23 - bruto22) / bruto22
@@ -176,7 +178,7 @@ elif st.session_state["authentication_status"]:
                 "{:,.1f}M".format(bruto23 / 1000000000),
                 delta="{:,.1f}%".format(tumbuh_bruto * 100),
             )
-    with col_tahun[2]:
+    with col_tahun[1]:
         net23 = data23["NETTO"].sum()
         net22 = data22["NETTO"].sum()
         tumbuh_net = (net23 - net22) / net22
@@ -193,27 +195,13 @@ elif st.session_state["authentication_status"]:
                 "{:,.1f}M".format(net23 / 1000000000),
                 delta="{:,.1f}%".format(tumbuh_net * 100),
             )
-    # with col_tahun[2]:
-    #     net23 = data23["NETTO"].sum()
-    #     net22 = data22["NETTO"].sum()
-    #     naik_net = net23 - net22
-    #     if (naik_net) > 1000000000000:
-    #         st.metric("Kenaikan Netto", "{:,.1f}T".format(naik_net / 1000000000000))
-    #     else:
-    #         st.metric("Kenaikan Netto", "{:,.1f}M".format(naik_net / 1000000000))
-    # with col_tahun[3]:
-    #     selisih = data23 - data22
-    #     if (data22 == 0) | (selisih == 0):
-    #         tumbuh = 0
-    #     else:
-    #         tumbuh = selisih / data22
-    #     st.metric("Tumbuh", "{:.1f}%".format(tumbuh * 100))
-    with col_tahun[3]:
+
+    with col_tahun[2]:
         persentase23 = net23 / 27601733880000
         persentase22 = net22 / 22656373555000
         tumbuh_persen = persentase23 - persentase22
         st.metric(
-            "Kontrib Target Kanwil",
+            "Capaian Kanwil",
             "{:.2f}%".format(persentase23 * 100),
             delta="{:.2f}%".format(tumbuh_persen * 100),
         )
@@ -468,6 +456,9 @@ elif st.session_state["authentication_status"]:
     map_pivot = pd.pivot_table(
         jenis_pajak, index="MAP", columns="TAHUNBAYAR", values="BRUTO"
     )
+    map_pivot["TUMBUH"] = (
+        (map_pivot["2023"] - map_pivot["2022"]) / map_pivot["2022"]
+    ) * 100
     map_pivot = map_pivot.nlargest(10, "2023")
 
     jenis_pajak9 = jenis_pajak[jenis_pajak["MAP"].isin(map_pivot.index)]
@@ -520,7 +511,7 @@ elif st.session_state["authentication_status"]:
         with chart_container(data_sektor_awal):
             st.plotly_chart(sektor_bar, use_container_width=True)
     with colgab[1]:
-        with chart_container(jenis_pajak):
+        with chart_container(map_pivot):
             st.plotly_chart(mapchart, use_container_width=True)
 
     st.markdown(
