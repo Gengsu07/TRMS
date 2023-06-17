@@ -1,4 +1,3 @@
-import importlib
 import altair as alt
 from streamlit_extras.metric_cards import style_metric_cards
 from streamlit_extras.app_logo import add_logo
@@ -15,7 +14,16 @@ from yaml.loader import SafeLoader
 import yaml
 import streamlit_authenticator as stauth
 import streamlit as st
-
+from scripts.login import names, usernames
+from scripts.db import (
+    sektor,
+    sektor_yoy,
+    jenis_pajak,
+    kpi,
+    linedata,
+    naikturun,
+    proporsi,
+)
 
 st.set_page_config(
     page_title="Tax Revenue Monitoring Sistem",
@@ -23,12 +31,9 @@ st.set_page_config(
     layout="wide",
 )
 
-prep = importlib.import_module("db")
-passw = importlib.import_module("login")
-
 # settings
 
-with open("style.css") as f:
+with open("style/style.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 
@@ -102,8 +107,10 @@ def data_ket(filter, filter22):
 with open(".streamlit/login.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
 
-names = passw.names()
-usernames = passw.usernames()
+names = names()
+usernames = usernames()
+# names = passw.names()
+# usernames = passw.usernames()
 
 
 authenticator = stauth.Authenticate(
@@ -159,7 +166,7 @@ elif st.session_state["authentication_status"]:
         border_color="#005FAC",
         border_left_color="#005FAC",
     )
-    data_kpi = prep.kpi(filter, filter22, filter_date, filter_date22)
+    data_kpi = kpi(filter, filter22, filter_date, filter_date22)
     data23, data22 = data_kpi
     col_tahun = st.columns(4)
 
@@ -222,7 +229,7 @@ elif st.session_state["authentication_status"]:
     )
 
     # linechart--------------------
-    linedata = prep.linedata(filter, filter22)
+    linedata = linedata(filter, filter22)
     linedata = linedata.groupby(["TAHUNBAYAR", "BULANBAYAR"])["sum"].sum().reset_index()
     linedata["text"] = linedata["sum"].apply(
         lambda x: "{:,.1f}M".format(x / 1000000000)
@@ -377,7 +384,7 @@ elif st.session_state["authentication_status"]:
 
     # PERSEKTOR-------------------------------------------------------------------------------
 
-    data_sektor_awal = prep.sektor_yoy(filter, filter22)
+    data_sektor_awal = sektor_yoy(filter, filter22)
     data_sektor_awal = data_sektor_awal[0]
     data_sektor_awal = (
         data_sektor_awal.groupby("NM_KATEGORI")
@@ -505,7 +512,7 @@ elif st.session_state["authentication_status"]:
     )
 
     # JENIS PAJAK----------------------------------------------------------------------
-    jenis_pajak = prep.jenis_pajak(filter, filter22)
+    jenis_pajak = jenis_pajak(filter, filter22)
     jenis_pajak = pd.pivot_table(
         jenis_pajak, index="MAP", columns="TAHUNBAYAR", values="BRUTO"
     )
@@ -570,7 +577,7 @@ elif st.session_state["authentication_status"]:
         barmode="group",
         height=820,
         xaxis=dict(visible=False),
-        title=dict(text="Per Jenis", x=0.5, y=0.95, font=dict(size=26)),
+        title=dict(text="Per Jenis(Bruto)", x=0.5, y=0.95, font=dict(size=26)),
         showlegend=True,
         bargap=0.2,
         font=dict(
@@ -590,7 +597,7 @@ elif st.session_state["authentication_status"]:
     )
 
     # TOP10-----------------------------------------------------------------------------------
-    topwp, botwp = prep.naikturun(filter, filter22)
+    topwp, botwp = naikturun(filter, filter22)
 
     topwp.iloc[:, 2:] = (topwp.iloc[:, 2:] / 1000000000).applymap(
         lambda x: "{:,.1f}".format(x)
@@ -603,7 +610,7 @@ elif st.session_state["authentication_status"]:
     with st.container():
         tab_wp = st.tabs(["Top 10 WP", "Top 10 Tumbuh", "Bottom 10 WP Tumbuh"])
         with tab_wp[0]:
-            data_proporsi = prep.proporsi(filter)
+            data_proporsi = proporsi(filter)
             with chart_container(data_proporsi):
                 # PROPORSI--------------------------------------------------------------------
                 data_proporsi = data_proporsi.iloc[:10,]

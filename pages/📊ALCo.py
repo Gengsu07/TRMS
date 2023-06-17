@@ -1,23 +1,19 @@
-import os
 import streamlit as st
 import pandas as pd
 from datetime import datetime
 from datetime import date
 from streamlit_extras.chart_container import chart_container
 from streamlit_extras.app_logo import add_logo
-from streamlit_extras.colored_header import colored_header
 from dateutil.relativedelta import relativedelta
-from streamlit_extras.altex import sparkline_chart
 from streamlit_extras.metric_cards import style_metric_cards
 import plotly.figure_factory as ff
 import plotly.express as px
 from math import ceil
-import importlib
 import plotly.graph_objects as go
+from scripts.db import sektor_yoy, growth_month
 
-prep = importlib.import_module("db")
 
-with open("pages_alco.css") as f:
+with open("style/pages_alco.css", "r") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 conn = st.experimental_connection("ppmpkm", type="sql")
 
@@ -107,21 +103,9 @@ else:
     )
 
     # SEKTORRRR CARD
-    sektor = prep.sektor_yoy(filter, filter22)
-    # sektor2023 = prep.sektor2023(filter)
+    sektor = sektor_yoy(filter, filter22)
     sektor_yoy, sektor_mom = sektor
-
-    # sektor_yoy = (
-    #     sektor_yoy.groupby(["NM_KATEGORI"])[["2022", "2023"]].sum().reset_index()
-    # )
-    # sektor_mom = (
-    #     sektor_mom.groupby(["NM_KATEGORI", "BULANBAYAR"])[["2022", "2023"]]
-    #     .sum()
-    #     .reset_index()
-    # )
-
-    # sektor_yoy["selisih"] = sektor_yoy["2023"] - sektor_yoy["2022"]
-    # sektor_yoy["tumbuh"] = (sektor_yoy["selisih"] / sektor_yoy["2022"]) * 100
+    sektor_yoy["%kontribusi"] = (sektor_yoy["2023"] / sektor_yoy["2023"].sum()) * 100
 
     urutan = st.selectbox("Urut Berdasarkan:", options=["2023", "2022", "tumbuh"])
     sektor_yoy1 = sektor_yoy[sektor_yoy["NM_KATEGORI"] != "KLU ERROR"]
@@ -250,16 +234,25 @@ else:
         with chart_container(sektor_yoy):
             st.dataframe(sektor_yoy)
 
+    # SUBSEKTOR---------------------------------------------------------------------------
+    st.subheader("🚧 SubSektor(under construction)🚧")
+
+    st.dataframe()
     # TUMBUH BULANAN-----------------------------------------------------------------------
-    tumbuh_bulanan = prep.growth_month(filter, filter22)
+    st.subheader("💡 Pertumbuhan Bulanan")
+    tumbuh_bulanan = growth_month(filter, filter22)
+
     tumbuh_bulanan.reset_index(inplace=True)
     tumbuh_bulanan.rename(columns={"index": "Growth"}, inplace=True)
+
+    tumbuh_bulanan.fillna(0, inplace=True)
     tumbuh_bulanan.iloc[:, 1:] = tumbuh_bulanan.iloc[:, 1:].applymap(
         lambda x: "{:,.2f}%".format(x)
     )
 
     with chart_container(tumbuh_bulanan):
         colorscale = [[0, "#005FAC"], [0.5, "#f2e5ff"], [1, "#ffffff"]]
+
         tumbuh = ff.create_table(tumbuh_bulanan, colorscale=colorscale)
-        st.subheader("💡 Pertumbuhan Bulanan")
+
         st.plotly_chart(tumbuh, use_container_width=True)

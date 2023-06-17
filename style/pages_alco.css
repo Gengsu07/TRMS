@@ -10,11 +10,12 @@
   margin: 0rem 10rem;
 }
 
-div.css-12w0qpk.esravye1 {
+[data-testid="column"] {
   border: 2px solid rgb(212, 203, 203);
   padding: 0rem 0.5rem;
   box-shadow: 0 0 10px rgba(212, 203, 203, 0.5);
   border-radius: 8px;
+  margin-top: 1rem;
 }
 
 /* span.css-10trblm.eqr7zpz0{
@@ -30,6 +31,9 @@ div.css-zt5igj.eqr7zpz3 {
   text-align: center;
 }
 
+a.css-eczf16.eqr7zpz2 {
+  align-items: center;
+}
 .css-18e3th9 {
   padding-top: 0rem;
   padding-bottom: 10rem;

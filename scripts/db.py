@@ -356,8 +356,7 @@ def growth_month(filter, filter22):
     """
 
     cy_data = conn.query(cy_kueri)
-    maks_bulan = cy_data["BULANBAYAR"].max()
-    print(maks_bulan)
+    maks_bulan = cy_data["BULANBAYAR"].count()
     py_data = conn.query(py_kueri)
     data = cy_data.merge(py_data, on="BULANBAYAR", how="inner")
     data["Tumbuh Bruto"] = (
