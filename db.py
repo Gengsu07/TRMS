@@ -110,30 +110,35 @@ def sektor(filter):
 def sektor_yoy(filter, filter2):
     kueri = f"""
     SELECT 
-    p."NM_KATEGORI" ,p."TAHUNBAYAR", sum(p."NOMINAL") AS "NOMINAL"
+    p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR", sum(p."NOMINAL") AS "NOMINAL"
     FROM 
     ppmpkm p 
     WHERE p."KET" !='SPMKP' and {filter}
-    GROUP BY p."NM_KATEGORI" ,p."TAHUNBAYAR"
+    GROUP BY p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR"
     UNION ALL 
     SELECT 
-    p."NM_KATEGORI" , p."TAHUNBAYAR", sum(p."NOMINAL") AS "NOMINAL"
+    p."NM_KATEGORI" , p."TAHUNBAYAR",p."BULANBAYAR", sum(p."NOMINAL") AS "NOMINAL"
     FROM 
     ppmpkm p 
     WHERE p."KET" !='SPMKP' and {filter2}
-    GROUP BY p."NM_KATEGORI" ,p."TAHUNBAYAR"
+    GROUP BY p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR"
     """
     data = conn.query(kueri)
     data["NM_KATEGORI"] = data["NM_KATEGORI"].map(dict_sektor)
     data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
-    data = data.pivot_table(
+    sektor_yoy = data.pivot_table(
         index=["NM_KATEGORI"], columns="TAHUNBAYAR", values="NOMINAL"
     ).reset_index()
     # data.columns = [x.strip() for x in data.columns]
-    data["selisih"] = data["2023"] - data["2022"]
-    data["tumbuh"] = (data["selisih"] / data["2022"]) * 100
-    data = data.sort_values(by="2023", ascending=False)
-    return data
+    sektor_yoy["selisih"] = sektor_yoy["2023"] - sektor_yoy["2022"]
+    sektor_yoy["tumbuh"] = (sektor_yoy["selisih"] / sektor_yoy["2022"]) * 100
+    sektor_yoy = sektor_yoy.sort_values(by="2023", ascending=False)
+
+    sektor_mom = data[data["TAHUNBAYAR"] == 2023]
+    sektor_mom = (
+        data.groupby(["NM_KATEGORI", "BULANBAYAR"])["NOMINAL"].sum().reset_index()
+    )
+    return [sektor_yoy, sektor_mom]
 
 
 def sektor2023(filter):
@@ -174,19 +179,41 @@ def jenis_pajak(filter, filter22):
     return jenis
 
 
-def kpi(filter, filter22):
+def kpi(filter, filter22, filter_date, filter_date22):
     mpn23 = conn.query(
-        f"""select 
-                sum( case when p."KET"!='SPMKP' then p."NOMINAL" END) as "BRUTO" ,
-                sum( p."NOMINAL") as "NETTO" 
-                from ppmpkm p where {filter} 
+        f""" SELECT
+            sum( CASE WHEN p."KET" != 'SPMKP' THEN p."NOMINAL" END) AS "BRUTO" ,
+            sum( p."NOMINAL") AS "NETTO" ,
+            (sum( p."NOMINAL" ) / 
+            (
+            SELECT
+                Sum( "NOMINAL" )
+            FROM
+                ppmpkm
+            WHERE {filter_date}
+                )) AS "KONTRIBUSI"
+            FROM
+                ppmpkm p
+            WHERE
+               {filter}
                 """
     )
     mpn22 = conn.query(
-        f"""select
-                sum( case when p."KET"!='SPMKP' then p."NOMINAL" END) as "BRUTO" ,
-                sum( p."NOMINAL") as "NETTO" 
-                from ppmpkm p where {filter22}
+        f""" SELECT
+            sum( CASE WHEN p."KET" != 'SPMKP' THEN p."NOMINAL" END) AS "BRUTO" ,
+            sum( p."NOMINAL") AS "NETTO" ,
+            (sum( p."NOMINAL") / 
+            (
+            SELECT
+                Sum( "NOMINAL" )
+            FROM
+                ppmpkm
+            WHERE {filter_date22}
+                )) AS "KONTRIBUSI"
+            FROM
+                ppmpkm p
+            WHERE
+               {filter22}
                 """
     )
     return [mpn23, mpn22]
@@ -333,16 +360,16 @@ def growth_month(filter, filter22):
     print(maks_bulan)
     py_data = conn.query(py_kueri)
     data = cy_data.merge(py_data, on="BULANBAYAR", how="inner")
-    data["TUMBUH BRUTO"] = (
+    data["Tumbuh Bruto"] = (
         (data["CY_BRUTO"] - data["PY_BRUTO"]) / data["PY_BRUTO"]
     ) * 100
-    data["TUMBUH NETTO"] = (
+    data["Tumbuh Netto"] = (
         (data["CY_NETTO"] - data["PY_NETTO"]) / data["PY_NETTO"]
     ) * 100
-    data["TUMBUH RESTITUSI"] = (
+    data["Tumbuh Restitusi"] = (
         (data["CY_RESTITUSI"] - data["PY_RESTITUSI"]) / data["PY_RESTITUSI"]
     ) * 100
-    data = data[["TUMBUH BRUTO", "TUMBUH NETTO", "TUMBUH RESTITUSI"]]
+    data = data[["Tumbuh Bruto", "Tumbuh Netto", "Tumbuh Restitusi"]]
     data = data.transpose()
     data.columns = [calendar.month_name[i] for i in range(1, maks_bulan + 1)]
     return data

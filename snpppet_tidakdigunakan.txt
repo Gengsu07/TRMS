@@ -183,3 +183,38 @@ sektor_bruto = go.Bar(
     map_bar.update_traces(
         textfont_size=12, textangle=0, textposition="outside", cliponaxis=False
     )
+
+
+
+table
+    go.Figure(
+            data=[
+                go.Table(
+                    header=dict(
+                        values=list(tumbuh_bulanan.columns),
+                        fill_color="#005FAC",
+                        line_color="gray",
+                        align=["center"] * tumbuh_bulanan.shape[1],
+                        font=dict(color="white", size=16),
+                        height=40,
+                    ),
+                    cells=dict(
+                        values=[tumbuh_bulanan[x] for x in tumbuh_bulanan.columns],
+                        fill_color="lavender",
+                        align="left",
+                        font_size=14,
+                        height=30,
+                    ),
+                )
+            ]
+        )
+        tumbuh.update_layout(
+            height=640,
+            width=960,
+            title=dict(
+                text="Tumbuh Bruto & Netto Per Bulan",
+                x=0.5,
+                y=0.95,
+                font=dict(size=26),
+            ),
+        )

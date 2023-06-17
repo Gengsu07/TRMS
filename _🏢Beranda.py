@@ -149,6 +149,8 @@ elif st.session_state["authentication_status"]:
     # filterdata
     filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen)
     filter = "and".join(x for x in filter_gabungan[0])
+    filter_date = "and".join(x for x in filter_gabungan[0][:2])
+    filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
     filter22 = "and".join(x for x in filter_gabungan[1])
 
     # KPI-----------------------------------------------------------------------------------
@@ -157,9 +159,9 @@ elif st.session_state["authentication_status"]:
         border_color="#005FAC",
         border_left_color="#005FAC",
     )
-    data_kpi = prep.kpi(filter, filter22)
+    data_kpi = prep.kpi(filter, filter22, filter_date, filter_date22)
     data23, data22 = data_kpi
-    col_tahun = st.columns(3)
+    col_tahun = st.columns(4)
 
     with col_tahun[0]:
         bruto23 = data23["BRUTO"].sum()
@@ -169,14 +171,14 @@ elif st.session_state["authentication_status"]:
         if (bruto23 / 1000000000000) > 1:
             st.metric(
                 "Bruto",
-                "{:,.1f}T".format(bruto23 / 1000000000000),
-                delta="{:,.1f}%".format(tumbuh_bruto * 100),
+                "{:,.2f}T".format(bruto23 / 1000000000000),
+                delta="{:,.2f}%".format(tumbuh_bruto * 100),
             )
         else:
             st.metric(
                 "Bruto",
-                "{:,.1f}M".format(bruto23 / 1000000000),
-                delta="{:,.1f}%".format(tumbuh_bruto * 100),
+                "{:,.2f}M".format(bruto23 / 1000000000),
+                delta="{:,.2f}%".format(tumbuh_bruto * 100),
             )
     with col_tahun[1]:
         net23 = data23["NETTO"].sum()
@@ -186,22 +188,30 @@ elif st.session_state["authentication_status"]:
         if (net23 / 1000000000000) > 1:
             st.metric(
                 "Netto",
-                "{:,.1f}T".format(net23 / 1000000000000),
-                delta="{:,.1f}%".format(tumbuh_net * 100),
+                "{:,.2f}T".format(net23 / 1000000000000),
+                delta="{:,.2f}%".format(tumbuh_net * 100),
             )
         else:
             st.metric(
                 "Netto",
-                "{:,.1f}M".format(net23 / 1000000000),
-                delta="{:,.1f}%".format(tumbuh_net * 100),
+                "{:,.2f}M".format(net23 / 1000000000),
+                delta="{:,.2f}%".format(tumbuh_net * 100),
             )
 
     with col_tahun[2]:
+        kontrib23 = (data23["KONTRIBUSI"][0]) * 100
+        kontrib22 = (data22["KONTRIBUSI"][0]) * 100
+        st.metric(
+            "Kontrib. Realisasi",
+            f"{kontrib23:,.2f}%",
+            delta=f"{kontrib23 - kontrib22:,.2f}%",
+        )
+    with col_tahun[3]:
         persentase23 = net23 / 27601733880000
         persentase22 = net22 / 22656373555000
         tumbuh_persen = persentase23 - persentase22
         st.metric(
-            "Capaian Kanwil",
+            "Kontrib. Target Kanwil",
             "{:.2f}%".format(persentase23 * 100),
             delta="{:.2f}%".format(tumbuh_persen * 100),
         )
@@ -221,8 +231,11 @@ elif st.session_state["authentication_status"]:
     linedata23 = linedata[linedata["TAHUNBAYAR"] == "2023"]
 
     linedata23["kumulatif"] = linedata23["sum"].cumsum()
+    linedata23["capaian_kumulatif"] = (linedata23["kumulatif"] / 27601733880000) * 100
+
     linedata22 = linedata[linedata["TAHUNBAYAR"] == "2022"]
     linedata22["kumulatif"] = linedata22["sum"].cumsum()
+    linedata22["capaian_kumulatif"] = (linedata22["kumulatif"] / 22656373555000) * 100
     linedata = pd.concat([linedata23, linedata22], axis=0, ignore_index=True)
 
     linechart = px.bar(
@@ -248,7 +261,14 @@ elif st.session_state["authentication_status"]:
     )
 
     line = px.line(
-        linedata, x="BULANBAYAR", y="kumulatif", color="TAHUNBAYAR", height=380
+        linedata,
+        x="BULANBAYAR",
+        y="kumulatif",
+        color="TAHUNBAYAR",
+        text=linedata["capaian_kumulatif"].apply(lambda x: "{:,.2f}%".format(x)),
+        height=380,
+        color_discrete_sequence=["#ffc91b", "#005FAC"],
+        markers=True,
     )
     line.update_layout(
         xaxis_title="",
@@ -274,10 +294,8 @@ elif st.session_state["authentication_status"]:
     colket = st.columns(5)
     with colket[0]:
         if "MPN" in ket.index:
-            format_number = "{:+,.1f}M" if ket.loc["MPN", "2023"] >= 0 else "{:-,.1f}M"
-            format_number_T = (
-                "{:+,.1f}T" if ket.loc["MPN", "2023"] >= 0 else "{:-,.1f}T"
-            )
+            format_number = "{:,.1f}M" if ket.loc["MPN", "2023"] >= 0 else "{:,.1f}M"
+            format_number_T = "{:,.1f}T" if ket.loc["MPN", "2023"] >= 0 else "{:,.1f}T"
             if ket.loc["MPN", "2023"] > 1000000000000:
                 st.metric(
                     "MPN",
@@ -298,7 +316,7 @@ elif st.session_state["authentication_status"]:
             st.metric("MPN", "0M")
     with colket[1]:
         if "SPM" in ket.index:
-            format_number = "{:+,.1f}M" if ket.loc["SPM", "2023"] >= 0 else "{:-,.1f}M"
+            format_number = "{:,.1f}M" if ket.loc["SPM", "2023"] >= 0 else "{:,.1f}M"
             st.metric(
                 "SPM",
                 format_number.format(ket.loc["SPM", "2023"] / 1000000000),
@@ -309,7 +327,7 @@ elif st.session_state["authentication_status"]:
     with colket[2]:
         if "PBK KIRIM" in ket.index:
             format_number = (
-                "{:+,.1f}M" if ket.loc["PBK KIRIM", "2023"] >= 0 else "{:-,.1f}M"
+                "{:,.1f}M" if ket.loc["PBK KIRIM", "2023"] >= 0 else "{:,.1f}M"
             )
             st.metric(
                 "PBK KIRIM",
@@ -321,7 +339,7 @@ elif st.session_state["authentication_status"]:
     with colket[3]:
         if "PBK TERIMA" in ket.index:
             format_number = (
-                "{:+,.1f}M" if ket.loc["PBK TERIMA", "2023"] >= 0 else "{:-,.1f}M"
+                "{:,.1f}M" if ket.loc["PBK TERIMA", "2023"] >= 0 else "{:,.1f}M"
             )
             st.metric(
                 "PBK TERIMA",
@@ -334,11 +352,9 @@ elif st.session_state["authentication_status"]:
             st.metric("PBK TERIMA", "0.0M")
     with colket[4]:
         if "SPMKP" in ket.index:
-            format_number = (
-                "{:+,.1f}M" if ket.loc["SPMKP", "2023"] >= 0 else "{:-,.1f}M"
-            )
+            format_number = "{:,.1f}M" if ket.loc["SPMKP", "2023"] >= 0 else "{:,.1f}M"
             format_number_T = (
-                "{:+,.1f}T" if ket.loc["SPMKP", "2023"] >= 0 else "{:-,.1f}T"
+                "{:,.1f}T" if ket.loc["SPMKP", "2023"] >= 0 else "{:,.1f}T"
             )
             if ket.loc["SPMKP", "2023"] > 1000000000000:
                 st.metric(
@@ -362,19 +378,21 @@ elif st.session_state["authentication_status"]:
     # PERSEKTOR-------------------------------------------------------------------------------
 
     data_sektor_awal = prep.sektor_yoy(filter, filter22)
+    data_sektor_awal = data_sektor_awal[0]
     data_sektor_awal = (
-        data_sektor_awal.groupby(["NM_KATEGORI"])
+        data_sektor_awal.groupby("NM_KATEGORI")
         .sum()
         .reset_index()
         .sort_values(by="2023", ascending=False)
         .reset_index()
         .drop(columns="index")
     )
-
+    # data_sektor_awal['kontribusi'] = data_sektor_awal['2023']/data_sektor_awal['2023'].sum()
     data_sektor9 = data_sektor_awal.nlargest(10, "2023")
     data_sektor_lain = data_sektor_awal[
         ~data_sektor_awal["NM_KATEGORI"].isin(data_sektor9["NM_KATEGORI"])
     ]
+
     data_sektor_lain = pd.DataFrame(
         [
             [
@@ -383,6 +401,7 @@ elif st.session_state["authentication_status"]:
                 data_sektor_lain["2023"].sum(),
                 data_sektor_lain["selisih"].sum(),
                 data_sektor_lain["tumbuh"].sum(),
+                # data_sektor_lain['kontribusi'].sum()
             ]
         ],
         columns=["NM_KATEGORI", "2022", "2023", "selisih", "tumbuh"],
@@ -392,49 +411,83 @@ elif st.session_state["authentication_status"]:
     data_sektor = data_sektor.assign(
         text22=data_sektor["2022"].apply(lambda x: "{:,.0f}M".format(x / 1000000000)),
         text23=data_sektor["2023"].apply(lambda x: "{:,.0f}M".format(x / 1000000000)),
-        kontribusi=data_sektor["2023"] / data_sektor["2023"].sum(),
+        kontribusi_2023=data_sektor["2023"] / data_sektor["2023"].sum(),
+        kontribusi_2022=data_sektor["2022"] / data_sektor["2022"].sum(),
     )
     data_sektor = data_sektor.assign(
-        kontrib_persen=data_sektor["kontribusi"].apply(
+        kontrib_persen23=data_sektor["kontribusi_2023"].apply(
+            lambda x: "{:,.1f}%".format(x * 100)
+        )
+    ).assign(
+        kontrib_persen22=data_sektor["kontribusi_2022"].apply(
             lambda x: "{:,.1f}%".format(x * 100)
         )
     )
-    # netto_val = "{:,.1f}M".format(data_sektor["NETTO"].sum() / 1000000000)
-    # bruto_val = "{:,.1f}M".format(data_sektor["BRUTO"].sum() / 1000000000)
-    # bar_sektor = px.bar(data_sektor, y='NM_KATEGORI', x='NETTO', title="Per Sektor(Netto)", orientation='h', text='text',
-    #                     width=1024, height=640)
+
     data_sektor.sort_values(by="2023", ascending=True, inplace=True)
 
-    sektor_bruto = go.Bar(
-        x=data_sektor["2023"],
+    sektor_chart = make_subplots(
+        rows=1,
+        cols=2,
+        shared_yaxes=True,
+        horizontal_spacing=0,
+    )
+    sektor23 = go.Bar(
+        x=data_sektor["2023"] / 1000000000,
         y=data_sektor["NM_KATEGORI"],
         name="2023",
         orientation="h",
-        marker=dict(color="#ffc91b"),
-        textangle=0,
-        base=0,
-        width=0.3,
-    )
-
-    sektor_net = go.Bar(
-        x=data_sektor["2022"],
-        y=data_sektor["NM_KATEGORI"],
-        name="2022",
-        orientation="h",
-        text=data_sektor["text23"],
-        textposition="outside",
+        text=data_sektor["kontrib_persen23"],
+        texttemplate="%{x:,.1f}M <br> (%{text})",
+        textposition="auto",
         marker=dict(color="#005FAC"),
         textangle=0,
         base=0,
     )
-    sektor_data = [sektor_net, sektor_bruto]
-    sektor_layout = go.Layout(barmode="stack")
+
+    sektor22 = go.Bar(
+        x=data_sektor["2022"] / 1000000000,
+        y=data_sektor["NM_KATEGORI"],
+        name="2022",
+        orientation="h",
+        text=data_sektor["kontrib_persen22"],
+        textposition="auto",
+        texttemplate="%{x:,.1f}M<br> (%{text})",
+        marker=dict(color="#ffc91b"),
+        textangle=0,
+        base=0,
+    )
+    sektor_data = [sektor22, sektor23]
+    sektor_layout = go.Layout(barmode="group")
     sektor_bar = go.Figure(data=sektor_data, layout=sektor_layout)
 
-    sektor_bar.update_layout(
-        barmode="stack",
-        height=720,
-        title=dict(text="Per Sektor", x=0.5, y=0.95, font=dict(size=26)),
+    # sektor_bar.update_xaxes(visible=False)
+
+    # kontribusi_bar = go.Bar(
+    #     x=data_sektor["kontribusi"],
+    #     y=data_sektor["NM_KATEGORI"],
+    #     name="kontribusi",
+    #     orientation="h",
+    #     text=data_sektor["kontrib_persen"],
+    #     textposition="auto",
+    #     marker=dict(color="#499894"),
+    #     textangle=0,
+    #     base=0,
+    #     showlegend=False,
+    # )
+    # kontrib_layout = go.Layout()
+    # kontribusi_chart = go.Figure(data=kontribusi_bar, layout=kontrib_layout)
+
+    # kontribusi_chart.update_xaxes(visible=False)
+    sektor_chart.add_trace(sektor_bar.data[0], row=1, col=1)
+    sektor_chart.add_trace(sektor_bar.data[1], row=1, col=2)
+    sektor_chart.update_xaxes(row=1, col=1, autorange="reversed", showticklabels=False)
+    sektor_chart.update_xaxes(row=1, col=2, showticklabels=False)
+
+    # sektor_chart.add_trace(kontribusi_chart.data[0], row=1, col=2)
+    sektor_chart.update_layout(
+        height=760,
+        title=dict(text="Per Sektor (Bruto)", x=0.5, y=0.95, font=dict(size=26)),
         showlegend=True,
         font=dict(
             family="Arial",
@@ -443,7 +496,8 @@ elif st.session_state["authentication_status"]:
         ),
     )
 
-    sektor_bar.update_xaxes(visible=False)
+    with chart_container(data_sektor_awal):
+        st.plotly_chart(sektor_chart, use_container_width=True)
 
     st.markdown(
         """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
@@ -452,52 +506,73 @@ elif st.session_state["authentication_status"]:
 
     # JENIS PAJAK----------------------------------------------------------------------
     jenis_pajak = prep.jenis_pajak(filter, filter22)
-
-    map_pivot = pd.pivot_table(
+    jenis_pajak = pd.pivot_table(
         jenis_pajak, index="MAP", columns="TAHUNBAYAR", values="BRUTO"
     )
-    map_pivot["TUMBUH"] = (
-        (map_pivot["2023"] - map_pivot["2022"]) / map_pivot["2022"]
-    ) * 100
-    map_pivot = map_pivot.nlargest(10, "2023")
+    jenis_pajak = (
+        jenis_pajak.assign(
+            tumbuh=round(
+                (
+                    (jenis_pajak["2023"] - jenis_pajak["2022"])
+                    / jenis_pajak["2022"]
+                    * 100
+                ),
+                2,
+            )
+        )
+        .assign(
+            kontrib23=round((jenis_pajak["2023"] / jenis_pajak["2023"].sum() * 100), 2)
+        )
+        .assign(
+            kontrib22=round((jenis_pajak["2022"] / jenis_pajak["2022"].sum() * 100), 2)
+        )
+        .sort_values(by="2023", ascending=False)
+    )
 
-    jenis_pajak9 = jenis_pajak[jenis_pajak["MAP"].isin(map_pivot.index)]
+    jenis_pajak9 = jenis_pajak.nlargest(10, "2023")
 
     jenis_pajak9 = jenis_pajak9.assign(
-        tbruto=jenis_pajak["BRUTO"].apply(lambda x: "{:,.1f}M".format(x / 1000000000)),
+        tbruto=jenis_pajak9["2023"].apply(lambda x: "{:,.1f}M".format(x / 1000000000))
     )
+    jenis_pajak9 = jenis_pajak9.sort_values(by="2023", ascending=True)
 
-    jenis_pajak9_23 = jenis_pajak9[jenis_pajak9["TAHUNBAYAR"] == "2023"].sort_values(
-        by="BRUTO", ascending=True
-    )
+    # jenis_pajak9_23 = jenis_pajak9[jenis_pajak9["TAHUNBAYAR"] == "2023"].sort_values(
+    #     by="BRUTO", ascending=True
+    # )
     mapbar23 = go.Bar(
-        x=jenis_pajak9_23["BRUTO"],
-        y=jenis_pajak9_23["MAP"],
+        x=jenis_pajak9["2023"] / 1000000000,
+        y=jenis_pajak9.index,
         name="2023",
         orientation="h",
-        text=jenis_pajak9_23["tbruto"],
+        text=jenis_pajak9["kontrib23"],
+        texttemplate="%{x:,.1f}M (%{text})%",
         textposition="outside",
-        marker=dict(color="#005FAC"),
+        marker=dict(color="#005FAC"),  # ffc91b
+        width=0.5,
     )
-    jenis_pajak9_22 = jenis_pajak9[jenis_pajak9["TAHUNBAYAR"] == "2022"].sort_values(
-        by="BRUTO", ascending=True
-    )
+    # jenis_pajak9_22 = jenis_pajak9[jenis_pajak9["TAHUNBAYAR"] == "2022"].sort_values(
+    #     by="BRUTO", ascending=True
+    # )
     mapbar22 = go.Bar(
-        x=jenis_pajak9_22["BRUTO"],
-        y=jenis_pajak9_22["MAP"],
+        x=jenis_pajak9["2022"] / 1000000000,
+        y=jenis_pajak9.index,
         name="2022",
         orientation="h",
+        text=jenis_pajak9["kontrib22"],
+        texttemplate="%{x:,.1f}M (%{text}%)",
+        textposition="auto",
         base=0,
-        width=0.3,
-        marker=dict(color="#ffc91b"),
+        marker=dict(color="#ffc91b"),  # ffc91b
+        width=0.5,
     )
-    data_map = [mapbar23, mapbar22]
+    data_map = [mapbar22, mapbar23]
     map_layout = go.Layout(
-        barmode="stack",
-        height=720,
+        barmode="group",
+        height=820,
         xaxis=dict(visible=False),
         title=dict(text="Per Jenis", x=0.5, y=0.95, font=dict(size=26)),
-        showlegend=False,
+        showlegend=True,
+        bargap=0.2,
         font=dict(
             family="Arial",
             size=12,
@@ -506,13 +581,8 @@ elif st.session_state["authentication_status"]:
     )
     mapchart = go.Figure(data=data_map, layout=map_layout)
 
-    colgab = st.columns(2)
-    with colgab[0]:
-        with chart_container(data_sektor_awal):
-            st.plotly_chart(sektor_bar, use_container_width=True)
-    with colgab[1]:
-        with chart_container(map_pivot):
-            st.plotly_chart(mapchart, use_container_width=True)
+    with chart_container(jenis_pajak):
+        st.plotly_chart(mapchart, use_container_width=True)
 
     st.markdown(
         """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,

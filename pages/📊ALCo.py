@@ -9,13 +9,15 @@ from streamlit_extras.colored_header import colored_header
 from dateutil.relativedelta import relativedelta
 from streamlit_extras.altex import sparkline_chart
 from streamlit_extras.metric_cards import style_metric_cards
+import plotly.figure_factory as ff
+import plotly.express as px
 from math import ceil
 import importlib
 import plotly.graph_objects as go
 
 prep = importlib.import_module("db")
 
-with open("style.css") as f:
+with open("pages_alco.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 conn = st.experimental_connection("ppmpkm", type="sql")
 
@@ -99,15 +101,27 @@ else:
     filter22 = "and".join(x for x in filter_gabungan[1])
 
     # Main apps
-    st.subheader("Year over Year")
-    st.text(f"(Bruto) {start} s.d. {end}")
+    st.subheader(f"Pertumbuhan Tahunan(Bruto) {start} s.d. {end}")
     style_metric_cards(
-        background_color="#FFFFFF", border_color="#005FAC", border_left_color="#005FAC"
+        background_color="#FFFFFF", border_color="#ffffff", border_left_color="#ffffff"
     )
 
     # SEKTORRRR CARD
-    sektor_yoy = prep.sektor_yoy(filter, filter22)
-    sektor2023 = prep.sektor2023(filter)
+    sektor = prep.sektor_yoy(filter, filter22)
+    # sektor2023 = prep.sektor2023(filter)
+    sektor_yoy, sektor_mom = sektor
+
+    # sektor_yoy = (
+    #     sektor_yoy.groupby(["NM_KATEGORI"])[["2022", "2023"]].sum().reset_index()
+    # )
+    # sektor_mom = (
+    #     sektor_mom.groupby(["NM_KATEGORI", "BULANBAYAR"])[["2022", "2023"]]
+    #     .sum()
+    #     .reset_index()
+    # )
+
+    # sektor_yoy["selisih"] = sektor_yoy["2023"] - sektor_yoy["2022"]
+    # sektor_yoy["tumbuh"] = (sektor_yoy["selisih"] / sektor_yoy["2022"]) * 100
 
     urutan = st.selectbox("Urut Berdasarkan:", options=["2023", "2022", "tumbuh"])
     sektor_yoy1 = sektor_yoy[sektor_yoy["NM_KATEGORI"] != "KLU ERROR"]
@@ -128,16 +142,51 @@ else:
     for row in range(1, rows + 1):
         container[row] = st.container()
         with container[row]:
-            col = st.columns(4)
+            cekisi = len(sektor_plus)
+            cek_baris = ceil(cekisi / 4)
+            sisa4 = cekisi % 4
+            if row < cek_baris:
+                col = st.columns(4)
+            elif sisa4 == 1:
+                col = st.columns([25, 75])
+            elif sisa4 == 2:
+                col = st.columns([25, 25, 75])
+            else:
+                col = st.columns([25, 25, 25, 25])
             for x in range(1, 5):
                 if counter <= len(sektor_plus):
                     with col[x - 1]:
                         data_col = sektor_plus[sektor_plus.index == counter]
+                        gridkat = data_col.loc[counter, "NM_KATEGORI"]
+                        sektor_mom_select = sektor_mom[
+                            sektor_mom["NM_KATEGORI"] == gridkat
+                        ]
+                        sektor_mom_select = sektor_mom_select.groupby("BULANBAYAR")[
+                            "NOMINAL"
+                        ].sum()
+                        spark = px.line(
+                            sektor_mom_select,
+                            x=sektor_mom_select.index,
+                            y="NOMINAL",
+                            markers=True,
+                            height=100,
+                            width=200,
+                        )
+                        spark.update_layout(
+                            template=None,
+                            xaxis_title="",
+                            yaxis_title="",
+                            yaxis={"visible": False},
+                            xaxis={"visible": False},
+                            margin=dict(l=0, r=0, t=0, b=0),
+                        )
+                        st.plotly_chart(spark, use_container_width=True)
                         st.metric(
                             data_col.loc[counter, "NM_KATEGORI"],
                             value=format_number(data_col.loc[counter, "2023"]),
                             delta="{:,.2f}%".format(data_col.loc[counter, "tumbuh"]),
                         )
+
                     counter += 1
 
     # SEKTOR MINUS
@@ -148,11 +197,47 @@ else:
     for row in range(1, rows + 1):
         container[row] = st.container()
         with container[row]:
-            col = st.columns(4)
+            cekisi = len(sektor_plus)
+            cek_baris = ceil(cekisi / 4)
+            sisa4 = cekisi % 4
+            if row < cek_baris:
+                col = st.columns(4)
+            elif sisa4 == 1:
+                col = st.columns([25, 75])
+            elif sisa4 == 2:
+                col = st.columns([25, 25, 75])
+            else:
+                col = st.columns([25, 25, 25, 25])
+
             for x in range(1, 5):
                 if counter <= len(sektor_min):
                     with col[x - 1]:
                         data_col = sektor_min[sektor_min.index == counter]
+                        gridkat = data_col.loc[counter, "NM_KATEGORI"]
+
+                        sektor_mom_select = sektor_mom[
+                            sektor_mom["NM_KATEGORI"] == gridkat
+                        ]
+                        sektor_mom_select = sektor_mom_select.groupby("BULANBAYAR")[
+                            "NOMINAL"
+                        ].sum()
+                        spark = px.line(
+                            sektor_mom_select,
+                            x=sektor_mom_select.index,
+                            y="NOMINAL",
+                            markers=True,
+                            height=100,
+                            width=200,
+                        )
+                        spark.update_layout(
+                            template=None,
+                            xaxis_title="",
+                            yaxis_title="",
+                            yaxis={"visible": False},
+                            xaxis={"visible": False},
+                            margin=dict(l=0, r=0, t=0, b=0),
+                        )
+                        st.plotly_chart(spark, use_container_width=True)
                         st.metric(
                             data_col.loc[counter, "NM_KATEGORI"],
                             value=format_number(data_col.loc[counter, "2023"]),
@@ -165,38 +250,16 @@ else:
         with chart_container(sektor_yoy):
             st.dataframe(sektor_yoy)
 
+    # TUMBUH BULANAN-----------------------------------------------------------------------
     tumbuh_bulanan = prep.growth_month(filter, filter22)
+    tumbuh_bulanan.reset_index(inplace=True)
+    tumbuh_bulanan.rename(columns={"index": "Growth"}, inplace=True)
+    tumbuh_bulanan.iloc[:, 1:] = tumbuh_bulanan.iloc[:, 1:].applymap(
+        lambda x: "{:,.2f}%".format(x)
+    )
 
     with chart_container(tumbuh_bulanan):
-        tumbuh = go.Figure(
-            data=[
-                go.Table(
-                    header=dict(
-                        values=list(tumbuh_bulanan.columns),
-                        fill_color="#005FAC",
-                        line_color="gray",
-                        align=["center"] * tumbuh_bulanan.shape[1],
-                        font=dict(color="white", size=16),
-                        height=40,
-                    ),
-                    cells=dict(
-                        values=[tumbuh_bulanan[x] for x in tumbuh_bulanan.columns],
-                        fill_color="lavender",
-                        align="left",
-                        font_size=14,
-                        height=30,
-                    ),
-                )
-            ]
-        )
-        tumbuh.update_layout(
-            height=640,
-            width=960,
-            title=dict(
-                text="Tumbuh Bruto & Netto Per Bulan",
-                x=0.5,
-                y=0.95,
-                font=dict(size=26),
-            ),
-        )
+        colorscale = [[0, "#005FAC"], [0.5, "#f2e5ff"], [1, "#ffffff"]]
+        tumbuh = ff.create_table(tumbuh_bulanan, colorscale=colorscale)
+        st.subheader("💡 Pertumbuhan Bulanan")
         st.plotly_chart(tumbuh, use_container_width=True)
