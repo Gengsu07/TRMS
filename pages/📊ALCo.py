@@ -13,8 +13,12 @@ import plotly.graph_objects as go
 from scripts.db import sektor_yoy, growth_month
 
 
-with open("style/pages_alco.css", "r") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+if st.session_state["darkmode"] == "on":
+    with open("style/pages_alco_darkmode.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+else:
+    with open("style/pages_alco.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 conn = st.experimental_connection("ppmpkm", type="sql")
 
 
@@ -75,6 +79,7 @@ else:
     with st.sidebar:
         add_logo("assets/unit.png", height=150)
         st.text(f"Salam Satu Bahu {st.session_state['name']}")
+
         mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
         start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
         end = st.date_input("Tgl Akhir", max_value=date.today())
@@ -98,6 +103,7 @@ else:
 
     # Main apps
     st.subheader(f"Pertumbuhan Tahunan(Bruto) {start} s.d. {end}")
+
     style_metric_cards(
         background_color="#FFFFFF", border_color="#ffffff", border_left_color="#ffffff"
     )

@@ -6,7 +6,7 @@ import streamlit as st
 
 conn = st.experimental_connection("ppmpkm", type="sql")
 dict_sektor = {
-    "PERDAGANGAN BESAR DAN ECERAN; REPARASI DAN PERAWATAN MOBIL DAN SEPEDA MOTOR": "PERDAGANGAN BESAR ECERAN<br>REPARASI PERAWATAN MOBIL",
+    "PERDAGANGAN BESAR DAN ECERAN; REPARASI DAN PERAWATAN MOBIL DAN SEPEDA MOTOR": "PERDAGANGAN BESAR ECERAN <br> REPARASI PERAWATAN MOBIL",
     "PENYEDIAAN AKOMODASI DAN PENYEDIAAN MAKAN MINUM": "PENYEDIAAN AKOMODASI<br>DAN PENYEDIAAN MAKAN MINUM",
     "PENGADAAN LISTRIK, GAS,UAP/AIR PANAS DAN UDARA DINGIN": "PENGADAAN LISTRIK, GAS,UAP/AIR PANAS<br>UDARA DINGIN",
     "PENGADAAN AIR, PENGELOLAAN SAMPAH DAN DAUR ULANG, PEMBUANGAN DAN PEMBERSIHAN LIMBAH DAN SAMPAH": "PENGADAAN AIR, PENGELOLAAN SAMPAH",
@@ -28,8 +28,31 @@ dict_sektor = {
     "PERTANIAN, KEHUTANAN DAN PERIKANAN": "PERTANIAN,KEHUTANAN,PERIKANAN",
     "JASA PROFESIONAL, ILMIAH DAN TEKNIS": "JASA PROFESIONAL,ILMIAH,TEKNIS",
 }
+target2023 = {
+    "001": 608265424000,
+    "002": 542401593000,
+    "003": 1150993826000,
+    "004": 843373880000,
+    "005": 1481697044000,
+    "007": 11518776933000,
+    "008": 616125873000,
+    "009": 1634143550000,
+    "097": 9205955757000,
+}
+target2022 = {
+    "001": 477310544000,
+    "002": 1180601400000,
+    "003": 1001261091000,
+    "004": 679223200000,
+    "005": 1041766662000,
+    "007": 8574702940000,
+    "008": 608619845000,
+    "009": 1200824695000,
+    "097": 7892063178000,
+}
 
 
+@st.cache_data
 def bruto(filter):
     kueri = f""" 
     select 
@@ -83,6 +106,7 @@ def bruto(filter):
     return bruto_ok
 
 
+@st.cache_data
 def sektor(filter):
     data_sektor = conn.query(
         f"""
@@ -107,6 +131,7 @@ def sektor(filter):
     return data_sektor
 
 
+@st.cache_data
 def sektor_yoy(filter, filter2):
     kueri = f"""
     SELECT 
@@ -141,6 +166,7 @@ def sektor_yoy(filter, filter2):
     return [sektor_yoy, sektor_mom]
 
 
+@st.cache_data
 def sektor2023(filter):
     kueri = f"""
     SELECT 
@@ -152,6 +178,19 @@ def sektor2023(filter):
     """
     sektor2023 = conn.query(kueri)
     return sektor2023
+
+
+def klu(filter):
+    kueri = f""" 
+        SELECT
+        p."NM_KATEGORI",p."NM_KLU" ,sum(p."NOMINAL") as "BRUTO"
+        FROM 
+        ppmpkm p
+        WHERE  p."KET" !='SPMKP' and {filter}
+        GROUP BY p."NM_KATEGORI",p."NM_KLU" 
+        ORDER BY sum(p."NOMINAL")"""
+    klu = conn.query(kueri)
+    return klu
 
 
 def jenis_pajak(filter, filter22):
@@ -179,6 +218,19 @@ def jenis_pajak(filter, filter22):
     return jenis
 
 
+def kjs(filter):
+    kueri = f""" 
+        SELECT
+        p."MAP",p."KDBAYAR" ,sum(p."NOMINAL") as "BRUTO"
+        FROM 
+        ppmpkm p
+        WHERE  p."KET" !='SPMKP' and {filter}
+        GROUP BY p."MAP",p."KDBAYAR"  """
+    kjs = conn.query(kueri)
+    return kjs
+
+
+@st.cache_data
 def kpi(filter, filter22, filter_date, filter_date22):
     mpn23 = conn.query(
         f""" SELECT
@@ -219,6 +271,7 @@ def kpi(filter, filter22, filter_date, filter_date22):
     return [mpn23, mpn22]
 
 
+@st.cache_data
 def linedata(filter, filter22):
     linedata = conn.query(
         f"""select p."BULANBAYAR",p."TAHUNBAYAR",sum("NOMINAL") from ppmpkm p 
@@ -234,6 +287,7 @@ def linedata(filter, filter22):
     return linedata
 
 
+@st.cache_data
 def naikturun(filter, filter22):
     kueri = f""" 
      SELECT
@@ -279,6 +333,7 @@ def naikturun(filter, filter22):
     return [top10, bot10]
 
 
+@st.cache_data
 def proporsi(filter):
     kueri = f""" 
     select 
@@ -329,6 +384,7 @@ def proporsi(filter):
     return bruto_ok
 
 
+@st.cache_data
 def growth_month(filter, filter22):
     cy_kueri = f""" 
     SELECT
@@ -372,3 +428,139 @@ def growth_month(filter, filter22):
     data = data.transpose()
     data.columns = [calendar.month_name[i] for i in range(1, maks_bulan + 1)]
     return data
+
+
+@st.cache_data
+def data_ket(filter, filter22):
+    ket = conn.query(
+        f"""select p."KET",abs(
+    sum(case when p."TAHUNBAYAR" =2023 then p."NOMINAL" end )) as "2023"
+    from ppmpkm p
+    where {filter}
+    GROUP BY p."KET"     """
+    )
+
+    ket22 = conn.query(
+        f"""select p."KET",abs(
+    sum(case when p."TAHUNBAYAR" =2022 then p."NOMINAL" end )) as "2022"
+    from ppmpkm p
+    where {filter22}
+    GROUP BY p."KET"     """
+    )
+    ketgab = ket.merge(ket22, on="KET", how="left")
+    ketgab["selisih"] = ketgab["2023"] - ketgab["2022"]
+    return ketgab
+
+
+@st.cache_data
+def target(kpp):
+    target2023 = {
+        "001": 608265424000,
+        "002": 542401593000,
+        "003": 1150993826000,
+        "004": 843373880000,
+        "005": 1481697044000,
+        "007": 11518776933000,
+        "008": 616125873000,
+        "009": 1634143550000,
+        "097": 9205955757000,
+    }
+    target2022 = {
+        "001": 477310544000,
+        "002": 1180601400000,
+        "003": 1001261091000,
+        "004": 679223200000,
+        "005": 1041766662000,
+        "007": 8574702940000,
+        "008": 608619845000,
+        "009": 1200824695000,
+        "097": 7892063178000,
+    }
+
+    if kpp:
+        target2023 = {key: target2023[key] for key in target2023.keys() if key in kpp}
+        target2022 = {key: target2022[key] for key in target2022.keys() if key in kpp}
+    else:
+        target2023 = {"110": 27601733880000}
+        target2022 = {"110": 22656373555000}
+    return [target2023, target2022]
+
+
+@st.cache_data
+def cluster(filter, filter22, kpp):
+    target2023 = {
+        "001": 608265424000,
+        "002": 542401593000,
+        "003": 1150993826000,
+        "004": 843373880000,
+        "005": 1481697044000,
+        "007": 11518776933000,
+        "008": 616125873000,
+        "009": 1634143550000,
+        "097": 9205955757000,
+    }
+    target2022 = {
+        "001": 477310544000,
+        "002": 1180601400000,
+        "003": 1001261091000,
+        "004": 679223200000,
+        "005": 1041766662000,
+        "007": 8574702940000,
+        "008": 608619845000,
+        "009": 1200824695000,
+        "097": 7892063178000,
+    }
+
+    if kpp:
+        target2023 = {key: target2023[key] for key in target2023.keys() if key in kpp}
+        target2022 = {key: target2022[key] for key in target2022.keys() if key in kpp}
+
+    target2023 = (
+        pd.DataFrame(data=target2023, index=["TARGET2023"]).transpose().reset_index()
+    )
+    target2022 = (
+        pd.DataFrame(data=target2022, index=["TARGET2022"]).transpose().reset_index()
+    )
+    target = pd.merge(target2023, target2022, on="index", how="inner").rename(
+        columns={"index": "ADMIN"}
+    )
+
+    kueri = f"""
+        SELECT
+        p."ADMIN" ,p."TAHUNBAYAR" ,
+        sum("NOMINAL" )AS netto
+        FROM
+        ppmpkm p
+        WHERE  {filter}
+        GROUP BY p."ADMIN" ,p."TAHUNBAYAR"
+        UNION ALL
+        SELECT
+        p."ADMIN" ,p."TAHUNBAYAR" ,
+        sum("NOMINAL" )AS netto
+        FROM
+        ppmpkm p
+        WHERE  {filter22}
+        GROUP BY p."ADMIN" ,p."TAHUNBAYAR"
+    """
+    realisasi = conn.query(kueri)
+    realisasi = (
+        realisasi.pivot_table(index="ADMIN", columns="TAHUNBAYAR", values="netto")
+        .reset_index()
+        .rename(columns={2023: "REALISASI2023", 2022: "REALISASI2022"})
+    )
+
+    capaian = pd.merge(target, realisasi, on="ADMIN", how="inner")
+    capaian = capaian.assign(
+        capaian=(capaian["REALISASI2023"] / capaian["TARGET2023"]) * 100
+    ).assign(
+        tumbuh=(
+            (capaian["REALISASI2023"] - capaian["REALISASI2022"])
+            / capaian["TARGET2022"]
+        )
+        * 100
+    )
+    return capaian
+
+
+if __name__ == "__main__":
+    cluster()

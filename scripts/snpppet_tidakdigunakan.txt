@@ -1,3 +1,12 @@
+[theme]
+base="dark"
+primaryColor="#bd93f9"
+backgroundColor="#282a36"
+secondaryBackgroundColor="#44475a"
+textColor="#fff"
+#textColor="#f8f8f2"
+
+
 # renpen_realisasi
 renpen_realisasi = conn.query('select * from renpen_realisasi')
 renpen_realisasi = renpen_realisasi.groupby(

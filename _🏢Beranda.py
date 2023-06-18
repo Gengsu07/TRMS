@@ -1,4 +1,4 @@
-import altair as alt
+import plotly.figure_factory as ff
 from streamlit_extras.metric_cards import style_metric_cards
 from streamlit_extras.app_logo import add_logo
 from streamlit_extras.chart_container import chart_container
@@ -14,22 +14,28 @@ from yaml.loader import SafeLoader
 import yaml
 import streamlit_authenticator as stauth
 import streamlit as st
-from scripts.login import names, usernames
-from scripts.db import (
-    sektor,
-    sektor_yoy,
-    jenis_pajak,
-    kpi,
-    linedata,
-    naikturun,
-    proporsi,
-)
 
 st.set_page_config(
     page_title="Tax Revenue Monitoring Sistem",
     page_icon="assets\logo_djo.png",
     layout="wide",
 )
+from scripts.login import names, usernames
+from scripts.db import (
+    data_ket,
+    target,
+    sektor,
+    klu,
+    sektor_yoy,
+    jenis_pajak,
+    kjs,
+    kpi,
+    linedata,
+    naikturun,
+    proporsi,
+    cluster,
+)
+
 
 # settings
 
@@ -42,12 +48,14 @@ conn = st.experimental_connection("ppmpkm", type="sql")
 # Function/module
 
 
+@st.cache_resource
 def list_to_sql(column, value):
     value_str = ",".join([f"'{x}'" for x in value])
     sql_filter = f'"{column}" IN ({value_str})'
     return sql_filter
 
 
+@st.cache_resource
 def cek_filter(start, end, kpp, map, sektor, segmen):
     filter_gabungan = []
     filter_gabungan22 = []
@@ -82,27 +90,6 @@ def cek_filter(start, end, kpp, map, sektor, segmen):
     return [filter_gabungan, filter_gabungan22]
 
 
-def data_ket(filter, filter22):
-    ket = conn.query(
-        f"""select p."KET",abs(
-    sum(case when p."TAHUNBAYAR" =2023 then p."NOMINAL" end )) as "2023"
-    from ppmpkm p
-    where {filter}
-    GROUP BY p."KET"     """
-    )
-
-    ket22 = conn.query(
-        f"""select p."KET",abs(
-    sum(case when p."TAHUNBAYAR" =2022 then p."NOMINAL" end )) as "2022"
-    from ppmpkm p
-    where {filter22}
-    GROUP BY p."KET"     """
-    )
-    ketgab = ket.merge(ket22, on="KET", how="left")
-    ketgab["selisih"] = ketgab["2023"] - ketgab["2022"]
-    return ketgab
-
-
 # ---AUTHENTICATION-------------------------------------------------------
 with open(".streamlit/login.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -111,7 +98,8 @@ names = names()
 usernames = usernames()
 # names = passw.names()
 # usernames = passw.usernames()
-
+if "darkmode" not in st.session_state:
+    st.session_state["darkmode"] = "off"
 
 authenticator = stauth.Authenticate(
     config["credentials"],
@@ -131,8 +119,13 @@ elif st.session_state["authentication_status"]:
         if st.session_state["authentication_status"]:
             authenticator.logout("Logout", "sidebar")
             st.text(f"Salam Satu Bahu: {name}")
-        # with open('assets\deep-learning.json')as dl:
-        #     animasi= json.load(dl)
+        theme = st.radio("DarkMode", ["on", "off"], horizontal=True)
+        if theme == "on":
+            with open("style/darkmode.css") as f:
+                st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+            st.session_state["darkmode"] = "on"
+        else:
+            st.session_state["darkmode"] = "off"
         add_logo("assets/unit.png", height=150)
         mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
         start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
@@ -168,9 +161,21 @@ elif st.session_state["authentication_status"]:
     )
     data_kpi = kpi(filter, filter22, filter_date, filter_date22)
     data23, data22 = data_kpi
-    col_tahun = st.columns(4)
+    col_tahun = st.columns(5)
 
     with col_tahun[0]:
+        capaian = target(kpp)
+        target2023, target2022 = capaian
+        target2023 = sum(target2023.values())
+        target2022 = sum(target2022.values())
+        naik_target = ((target2023 - target2022) / target2022) * 100
+        if (target2023 / 1000000000000) > 1:
+            st.metric(
+                "Target",
+                "{:,.2f}T".format(target2023 / 1000000000000),
+                delta="{:,.2f}%".format(naik_target),
+            )
+    with col_tahun[1]:
         bruto23 = data23["BRUTO"].sum()
         bruto22 = data22["BRUTO"].sum()
         tumbuh_bruto = (bruto23 - bruto22) / bruto22
@@ -187,7 +192,7 @@ elif st.session_state["authentication_status"]:
                 "{:,.2f}M".format(bruto23 / 1000000000),
                 delta="{:,.2f}%".format(tumbuh_bruto * 100),
             )
-    with col_tahun[1]:
+    with col_tahun[2]:
         net23 = data23["NETTO"].sum()
         net22 = data22["NETTO"].sum()
         tumbuh_net = (net23 - net22) / net22
@@ -205,7 +210,7 @@ elif st.session_state["authentication_status"]:
                 delta="{:,.2f}%".format(tumbuh_net * 100),
             )
 
-    with col_tahun[2]:
+    with col_tahun[3]:
         kontrib23 = (data23["KONTRIBUSI"][0]) * 100
         kontrib22 = (data22["KONTRIBUSI"][0]) * 100
         st.metric(
@@ -213,16 +218,24 @@ elif st.session_state["authentication_status"]:
             f"{kontrib23:,.2f}%",
             delta=f"{kontrib23 - kontrib22:,.2f}%",
         )
-    with col_tahun[3]:
-        persentase23 = net23 / 27601733880000
-        persentase22 = net22 / 22656373555000
+    with col_tahun[4]:
+        persentase23 = net23 / target2023
+        persentase22 = net22 / target2022
         tumbuh_persen = persentase23 - persentase22
         st.metric(
-            "Kontrib. Target Kanwil",
+            "Capaian",
             "{:.2f}%".format(persentase23 * 100),
             delta="{:.2f}%".format(tumbuh_persen * 100),
         )
-
+    with st.expander("keterangan"):
+        keterangan = """
+        - Target : Per KPP, atau sesuai KPP yang dipilih
+        - Bruto : Penerimaan tanpa SPMKP/Restitusi
+        - Netto : Semua Penerimaan
+        - Kontrib. Realisasi : Kontribusi Realisasi per Total Realisasi Kanwil DJP Jakarta Timur
+        - Capaian : Per KPP, atau KPP yg dipilih
+        """
+        st.markdown(keterangan)
     st.markdown(
         """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
         unsafe_allow_html=True,
@@ -253,8 +266,15 @@ elif st.session_state["authentication_status"]:
         text="text",
         height=380,
         barmode="group",
+        custom_data=["TAHUNBAYAR"],
     )
 
+    hovertemplate = (
+        "<b>%{x}</b><br><br>"
+        + "NOMINAL: %{text} <br>"
+        + "TAHUNBAYAR: %{customdata[0]} <extra></extra>"
+    )
+    linechart.update_traces(hovertemplate=hovertemplate)
     linechart.update_layout(
         xaxis_title="",
         yaxis_title="",
@@ -263,20 +283,30 @@ elif st.session_state["authentication_status"]:
             "tickmode": "array",
             "tickvals": [x for x in range(1, 13)],
             "ticktext": [calendar.month_name[i] for i in range(1, 13)],
+            # "tickfont": {"color": "#fff"},
         },
+        paper_bgcolor="rgba(0, 0, 0, 0)",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
         autosize=True,
     )
 
     line = px.line(
         linedata,
         x="BULANBAYAR",
-        y="kumulatif",
+        y=linedata["kumulatif"] / 1000000000,
         color="TAHUNBAYAR",
         text=linedata["capaian_kumulatif"].apply(lambda x: "{:,.2f}%".format(x)),
         height=380,
         color_discrete_sequence=["#ffc91b", "#005FAC"],
         markers=True,
+        custom_data=["TAHUNBAYAR"],
     )
+    hovertemplate = (
+        "<b>%{x}</b><br><br>"
+        + "TAHUNBAYAR: %{customdata[0]} <br>"
+        + "KUMULATIF: %{y:,.2f}M <br><extra></extra>"
+    )
+    line.update_traces(hovertemplate=hovertemplate)
     line.update_layout(
         xaxis_title="",
         yaxis_title="",
@@ -285,7 +315,10 @@ elif st.session_state["authentication_status"]:
             "tickmode": "array",
             "tickvals": [x for x in range(1, 13)],
             "ticktext": [calendar.month_name[i] for i in range(1, 13)],
+            # "tickfont": {"color": "#fff"},
         },
+        paper_bgcolor="rgba(0, 0, 0, 0)",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
         autosize=True,
     )
     with chart_container(linedata):
@@ -494,24 +527,61 @@ elif st.session_state["authentication_status"]:
     # sektor_chart.add_trace(kontribusi_chart.data[0], row=1, col=2)
     sektor_chart.update_layout(
         height=760,
-        title=dict(text="Per Sektor (Bruto)", x=0.5, y=0.95, font=dict(size=26)),
+        title=dict(
+            text="Per Sektor (Bruto)",
+            font=dict(color="slategrey", size=26),
+            x=0.5,
+            y=0.95,
+        ),
         showlegend=True,
+        # yaxis=dict(tickfont=dict(color="#fff")),
         font=dict(
             family="Arial",
             size=12,
-            color="#333333",
+            color="slategrey",
         ),
+        paper_bgcolor="rgba(0, 0, 0, 0)",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
     )
 
     with chart_container(data_sektor_awal):
         st.plotly_chart(sektor_chart, use_container_width=True)
 
+    klu = klu(filter)
+    klu["BRUTO_M"] = klu["BRUTO"] / 1000000000
+    klu["Kontribusi"] = ((klu["BRUTO"] / klu["BRUTO"].sum()) * 100).apply(
+        lambda x: "{:,.2f}%".format(x)
+    )
+    kluchart = px.treemap(
+        klu,
+        labels="NM_KLU",
+        values="BRUTO_M",
+        path=["NM_KLU"],
+        color="NM_KATEGORI",
+        color_discrete_sequence=px.colors.qualitative.Safe,
+        height=560,
+        custom_data=["Kontribusi"],
+    )
+    kluchart.update_traces(
+        hovertemplate="<b>%{label}</b>(%{customdata[0]})<br><br>"
+        + "NM KLU: %{id}<br>"
+        + "BRUTO: %{value:,.1f}M <extra></extra>"
+    )
+
+    kluchart.update_layout(
+        paper_bgcolor="rgba(0, 0, 0, 0)",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
+        xaxis_title="",
+        yaxis_title="",
+    )
+    with chart_container(klu):
+        st.plotly_chart(kluchart, use_container_width=True)
+
     st.markdown(
         """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
         unsafe_allow_html=True,
     )
-
-    # JENIS PAJAK----------------------------------------------------------------------
+    # JENIS PAJAK----------------------------------------------------------------------------------------
     jenis_pajak = jenis_pajak(filter, filter22)
     jenis_pajak = pd.pivot_table(
         jenis_pajak, index="MAP", columns="TAHUNBAYAR", values="BRUTO"
@@ -557,9 +627,7 @@ elif st.session_state["authentication_status"]:
         marker=dict(color="#005FAC"),  # ffc91b
         width=0.5,
     )
-    # jenis_pajak9_22 = jenis_pajak9[jenis_pajak9["TAHUNBAYAR"] == "2022"].sort_values(
-    #     by="BRUTO", ascending=True
-    # )
+
     mapbar22 = go.Bar(
         x=jenis_pajak9["2022"] / 1000000000,
         y=jenis_pajak9.index,
@@ -577,19 +645,58 @@ elif st.session_state["authentication_status"]:
         barmode="group",
         height=820,
         xaxis=dict(visible=False),
-        title=dict(text="Per Jenis(Bruto)", x=0.5, y=0.95, font=dict(size=26)),
+        # yaxis=dict(tickfont=dict(color="#fff")),
+        title=dict(
+            text="Per Jenis(Bruto)",
+            # font=dict(color="#4d5b69"),
+            x=0.5,
+            y=0.95,
+            font=dict(size=26, color="slategrey"),
+        ),
         showlegend=True,
         bargap=0.2,
         font=dict(
             family="Arial",
             size=12,
-            color="#333333",
+            color="slategrey",
         ),
+        paper_bgcolor="rgba(0, 0, 0, 0)",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
     )
     mapchart = go.Figure(data=data_map, layout=map_layout)
 
     with chart_container(jenis_pajak):
         st.plotly_chart(mapchart, use_container_width=True)
+
+    kjs = kjs(filter)
+    kjs["BRUTO_M"] = kjs["BRUTO"] / 1000000000
+    kjs["Kontribusi"] = (kjs["BRUTO"] / kjs["BRUTO"].sum()) * 100
+    kjschart = px.treemap(
+        kjs,
+        labels="KDBAYAR",
+        values="BRUTO_M",
+        path=["KDBAYAR"],
+        color="MAP",
+        color_discrete_sequence=px.colors.qualitative.Safe,
+        height=560,
+        custom_data=["Kontribusi"],
+    )
+    hovertemplate = (
+        "<b>%{label}</b><br><br>"
+        + "KDBAYAR: %{id}<br>"
+        + "%{customdata[0]:,.2f} persen<br>"
+        + "BRUTO: %{value:,.1f}M <extra></extra>"
+    )
+    kjschart.update_traces(hovertemplate=hovertemplate)
+
+    kjschart.update_layout(
+        paper_bgcolor="rgba(0, 0, 0, 0)",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
+        xaxis_title="",
+        yaxis_title="",
+    )
+    with chart_container(kjs):
+        st.plotly_chart(kjschart, use_container_width=True)
 
     st.markdown(
         """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
@@ -656,8 +763,10 @@ elif st.session_state["authentication_status"]:
                         text="10 WP Terbesar Bruto",
                         x=0.5,
                         y=0.95,
-                        font=dict(size=26),
+                        font=dict(size=26, color="slategrey"),
                     ),
+                    paper_bgcolor="rgba(0, 0, 0, 0)",
+                    plot_bgcolor="rgba(0, 0, 0, 0)",
                 )
                 st.plotly_chart(proporsi_chart, use_container_width=True)
         with tab_wp[1]:
@@ -719,7 +828,7 @@ elif st.session_state["authentication_status"]:
                         text="10 Tumbuh Terbesar Bruto",
                         x=0.5,
                         y=0.95,
-                        font=dict(size=26),
+                        font=dict(size=26, color="slategrey"),
                     ),
                 )
                 st.plotly_chart(table_top, use_container_width=True)
@@ -768,6 +877,71 @@ elif st.session_state["authentication_status"]:
                     )
                 ]
             )
-            table_bot.update_layout(height=640, width=1024)
+            table_bot.update_layout(
+                height=640,
+                width=1024,
+                title=dict(
+                    text="10 Tumbuh Terendah Bruto",
+                    x=0.5,
+                    y=0.95,
+                    font=dict(size=26, color="slategrey"),
+                ),
+            )
             with chart_container(botwp):
                 st.plotly_chart(table_bot, use_container_width=True)
+
+    # CLUSTER KPP ------------------------------------------------------------------------------------
+    capaian = cluster(filter, filter22, kpp)
+    capaian_table = capaian.copy()
+    capaian_table.loc[:, "TARGET2023":"REALISASI2023"] = capaian_table.loc[
+        :, "TARGET2023":"REALISASI2023"
+    ].applymap(lambda x: "{:,.2f}M".format(x / 1000000000))
+    capaian_table.loc[:, "capaian":] = capaian_table.loc[:, "capaian":].applymap(
+        lambda x: "{:,.2f}%".format(x)
+    )
+    capaian_table = ff.create_table(capaian_table)
+    avg_capaian = capaian["capaian"].mean()
+    avg_tumbuh = capaian["tumbuh"].mean()
+
+    cluster_chart = px.scatter(
+        capaian,
+        x="capaian",
+        y="tumbuh",
+        text="ADMIN",
+        color_continuous_scale=px.colors.diverging.RdBu,
+    )
+    hovertemplate = (
+        "<b>%{text}</b><br><br>"
+        + "Capaian: %{x:,.2f}persen <br>"
+        + "Tumbuh: %{y:,.2f}persen <extra></extra>"
+    )
+    cluster_chart.update_traces(
+        marker=dict(size=20, color="#F86F03"),
+        textposition="bottom center",
+        textfont=dict(color="#F86F03", size=14),
+        hovertemplate=hovertemplate,
+    )
+    cluster_chart.add_hline(
+        y=avg_tumbuh, line_dash="dash", line_color="red", name="Rata2 Tumbuh"
+    )
+    cluster_chart.add_vline(
+        x=avg_capaian, line_dash="dash", line_color="red", name="Rata2 Capaian"
+    )
+    cluster_chart.add_trace(
+        go.Scatter(
+            x=[avg_capaian],
+            y=[avg_tumbuh],
+            mode="markers",
+            marker=dict(color="green", symbol="x", size=20),
+            name="Rata-rata",
+        )
+    )
+    cluster_chart.update_layout(
+        paper_bgcolor="#F6FFF8",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
+    )
+    st.subheader("Clustering Capaian Unit Kerja")
+    st.plotly_chart(cluster_chart, use_container_width=True)
+
+    st.plotly_chart(capaian_table, use_container_width=True)
+    # target2023
