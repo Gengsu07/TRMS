@@ -6,4 +6,3 @@ streamlit-extras
 streamlit-authenticator
 plotly
 entrypoints
-streamlit-lottie
