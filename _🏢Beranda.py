@@ -451,7 +451,7 @@ elif st.session_state["authentication_status"]:
 
     # PERSEKTOR-------------------------------------------------------------------------------
 
-    data_sektor_awal = sektor_yoy(filter, filter22)
+    data_sektor_awal = sektor_yoy(filter, filter22, includewp=True)
     data_sektor_awal = data_sektor_awal[0]
     data_sektor_chart = (
         data_sektor_awal.groupby("NM_KATEGORI")
@@ -612,7 +612,8 @@ elif st.session_state["authentication_status"]:
     with chart_container(data_sektor_table):
         st.plotly_chart(sektor_chart, use_container_width=True)
 
-    st.dataframe(data_sektor_table, use_container_width=True)
+    with chart_container(data_sektor_table):
+        st.dataframe(data_sektor_table, use_container_width=True)
 
     klu_data = klu(filter)
     klu = klu_data.copy()
@@ -663,7 +664,7 @@ elif st.session_state["authentication_status"]:
     )
     jenis_pajak = (
         jenis_pajak.assign(
-            tumbuh=round(
+            TUMBUH=round(
                 (
                     (jenis_pajak["2023"] - jenis_pajak["2022"])
                     / jenis_pajak["2022"]
@@ -673,10 +674,14 @@ elif st.session_state["authentication_status"]:
             )
         )
         .assign(
-            kontrib23=round((jenis_pajak["2023"] / jenis_pajak["2023"].sum() * 100), 2)
+            KONTRIBUSI2023=round(
+                (jenis_pajak["2023"] / jenis_pajak["2023"].sum() * 100), 2
+            )
         )
         .assign(
-            kontrib22=round((jenis_pajak["2022"] / jenis_pajak["2022"].sum() * 100), 2)
+            KONTRIBUSI2022=round(
+                (jenis_pajak["2022"] / jenis_pajak["2022"].sum() * 100), 2
+            )
         )
         .sort_values(by="2023", ascending=False)
     )
@@ -696,7 +701,7 @@ elif st.session_state["authentication_status"]:
         y=jenis_pajak9.index,
         name="2023",
         orientation="h",
-        text=jenis_pajak9["kontrib23"],
+        text=jenis_pajak9["KONTRIBUSI2023"],
         texttemplate="%{x:,.1f}M (%{text})%",
         textposition="outside",
         marker=dict(color="#005FAC"),  # ffc91b
@@ -708,7 +713,7 @@ elif st.session_state["authentication_status"]:
         y=jenis_pajak9.index,
         name="2022",
         orientation="h",
-        text=jenis_pajak9["kontrib22"],
+        text=jenis_pajak9["KONTRIBUSI2022"],
         texttemplate="%{x:,.1f}M (%{text}%)",
         textposition="auto",
         base=0,
@@ -740,9 +745,13 @@ elif st.session_state["authentication_status"]:
     )
     mapchart = go.Figure(data=data_map, layout=map_layout)
 
-    with chart_container(jenis_pajak):
+    with chart_container(jenis_pajak9):
         st.plotly_chart(mapchart, use_container_width=True)
-    st.dataframe(jenis_pajak, use_container_width=True)
+    with chart_container(jenis_pajak.reset_index()):
+        jenis_pajak = jenis_pajak[
+            ["2022", "KONTRIBUSI2022", "2023", "KONTRIBUSI2023", "TUMBUH"]
+        ]
+        st.dataframe(jenis_pajak, use_container_width=True)
 
     kjs = kjs(filter)
     kjs["BRUTO_M"] = kjs["BRUTO"] / 1000000000
@@ -799,7 +808,7 @@ elif st.session_state["authentication_status"]:
     with st.container():
         tab_wp = st.tabs(["Top 10 WP", "Top 10 Tumbuh", "Bottom 10 WP Tumbuh"])
         with tab_wp[0]:
-            data_proporsi = proporsi(filter)
+            data_proporsi, bruto = proporsi(filter)
             with chart_container(data_proporsi):
                 # PROPORSI--------------------------------------------------------------------
                 data_proporsi = data_proporsi.iloc[:10,]
@@ -851,6 +860,8 @@ elif st.session_state["authentication_status"]:
                     plot_bgcolor="rgba(0, 0, 0, 0)",
                 )
                 st.plotly_chart(proporsi_chart, use_container_width=True)
+            with chart_container(bruto):
+                st.dataframe(bruto, use_container_width=True)
         with tab_wp[1]:
             with chart_container(topwp):
                 table_top = go.Figure(

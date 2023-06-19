@@ -28,7 +28,7 @@ def list_to_sql(column, value):
     return sql_filter
 
 
-def cek_filter(start, end, kpp, map, sektor, segmen):
+def cek_filter(start, end, kpp, map, sektor, segmen, wp):
     filter_gabungan = []
     filter_gabungan22 = []
     if start:
@@ -59,6 +59,10 @@ def cek_filter(start, end, kpp, map, sektor, segmen):
         filter_segmen = list_to_sql("SEGMENTASI_WP", segmen)
         filter_gabungan.append(filter_segmen)
         filter_gabungan22.append(filter_segmen)
+    if wp:
+        filter_wp = list_to_sql("NAMA_WP", wp)
+        filter_gabungan.append(filter_wp)
+        filter_gabungan22.append(filter_wp)
     return [filter_gabungan, filter_gabungan22]
 
 
@@ -95,9 +99,15 @@ else:
             """select distinct "SEGMENTASI_WP" from ppmpkm where "SEGMENTASI_WP" notnull and "SEGMENTASI_WP"!='' """
         )
         segmen = st.multiselect("SEGMENTASI", options=segmen.iloc[:, 0].tolist())
+        # wp
+        wp = conn.query(
+            """select distinct "NAMA_WP" from ppmpkm where "NAMA_WP" notnull and "NAMA_WP"!=''
+            """
+        )
+        wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
 
     # filterdata
-    filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen)
+    filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
     filter = "and".join(x for x in filter_gabungan[0])
     filter22 = "and".join(x for x in filter_gabungan[1])
 
@@ -109,7 +119,7 @@ else:
     )
 
     # SEKTORRRR CARD
-    sektor = sektor_yoy(filter, filter22)
+    sektor = sektor_yoy(filter, filter22, includewp=False)
     sektor_yoy, sektor_mom = sektor
     sektor_yoy["%kontribusi"] = (sektor_yoy["2023"] / sektor_yoy["2023"].sum()) * 100
 
