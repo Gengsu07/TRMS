@@ -1,3 +1,10 @@
+.css-6qob1r {
+  background-color: #44475a;
+  border: 1px solid rgba(212, 203, 203, 0.5);
+  box-shadow: 0 0 5px rgba(212, 203, 203, 0.5);
+  border-radius: 3px;
+}
+
 [data-testid="stForm"] {
   margin: 0rem 10rem;
 }
@@ -13,13 +20,6 @@
 [data-testid="stHeader"] {
   background-color: #282a36;
   visibility: hidden;
-}
-
-[data-testid="stSidebar"] {
-  background-color: #44475a;
-  border: 2px solid rgba(212, 203, 203, 0.5);
-  box-shadow: 0 0 10px rgba(212, 203, 203, 0.5);
-  border-radius: 8px;
 }
 
 div.css-zt5igj {

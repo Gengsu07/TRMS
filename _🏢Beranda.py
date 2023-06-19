@@ -133,7 +133,7 @@ elif st.session_state["authentication_status"]:
         if st.session_state["authentication_status"]:
             authenticator.logout("Logout", "sidebar")
             st.text(f"Salam Satu Bahu: {name}")
-        theme = st.radio("DarkMode", ["on", "off"], horizontal=True)
+        theme = st.radio("DarkMode", ["on", "off"], horizontal=True, index=1)
         if theme == "on":
             with open("style/darkmode.css") as f:
                 st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
@@ -1037,6 +1037,6 @@ elif st.session_state["authentication_status"]:
     st.plotly_chart(cluster_chart, use_container_width=True)
 
     st.plotly_chart(capaian_table, use_container_width=True)
-    st.subheader("Clustering Wajib Pajak Madya")
-    st.subheader("Clustering 100 Wajib Pajak Besar KPP Pratama")
+    st.subheader("Clustering Wajib Pajak Madya(underconstruction)")
+    st.subheader("Clustering 100 Wajib Pajak Besar KPP Pratama(underconstruction)")
     # target2023
