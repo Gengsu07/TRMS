@@ -134,35 +134,48 @@ def sektor(filter):
 @st.cache_data
 def sektor_yoy(filter, filter2):
     kueri = f"""
-    SELECT 
+    SELECT p."NAMA_WP",
     p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR", sum(p."NOMINAL") AS "NOMINAL"
     FROM 
     ppmpkm p 
     WHERE p."KET" !='SPMKP' and {filter}
-    GROUP BY p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR"
+    GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR"
     UNION ALL 
-    SELECT 
+    SELECT p."NAMA_WP",
     p."NM_KATEGORI" , p."TAHUNBAYAR",p."BULANBAYAR", sum(p."NOMINAL") AS "NOMINAL"
     FROM 
     ppmpkm p 
     WHERE p."KET" !='SPMKP' and {filter2}
-    GROUP BY p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR"
+    GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR"
     """
     data = conn.query(kueri)
-    data["NM_KATEGORI"] = data["NM_KATEGORI"].map(dict_sektor)
-    data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
-    sektor_yoy = data.pivot_table(
-        index=["NM_KATEGORI"], columns="TAHUNBAYAR", values="NOMINAL"
-    ).reset_index()
-    # data.columns = [x.strip() for x in data.columns]
-    sektor_yoy["selisih"] = sektor_yoy["2023"] - sektor_yoy["2022"]
-    sektor_yoy["tumbuh"] = (sektor_yoy["selisih"] / sektor_yoy["2022"]) * 100
-    sektor_yoy = sektor_yoy.sort_values(by="2023", ascending=False)
+    if data["NOMINAL"].sum() > 0:
+        data["NM_KATEGORI"] = data["NM_KATEGORI"].map(dict_sektor)
+        data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
+        sektor_yoy = data.pivot_table(
+            index=["NAMA_WP", "NM_KATEGORI"], columns="TAHUNBAYAR", values="NOMINAL"
+        ).reset_index()
+        # data.columns = [x.strip() for x in data.columns]
 
-    sektor_mom = data[data["TAHUNBAYAR"] == 2023]
-    sektor_mom = (
-        data.groupby(["NM_KATEGORI", "BULANBAYAR"])["NOMINAL"].sum().reset_index()
-    )
+        sektor_yoy = sektor_yoy.sort_values(by="2023", ascending=False)
+
+        sektor_mom = data[data["TAHUNBAYAR"] == 2023]
+        sektor_mom = (
+            data.groupby(["NAMA_WP", "NM_KATEGORI", "BULANBAYAR"])["NOMINAL"]
+            .sum()
+            .reset_index()
+        )
+    else:
+        sektor_yoy = pd.DataFrame(
+            [["", "", "", ""]], columns=["NAMA_WP", "NM_KATEGORI", "2023", "2022"]
+        )
+        sektor_yoy["selisih"] = 0
+        sektor_yoy["tumbuh"] = 0
+        sektor_mom = pd.DataFrame(
+            [["", "", "", ""]], columns=["NAMA_WP", "NM_KATEGORI", "2023", "2022"]
+        )
+        sektor_mom["selisih"] = 0
+        sektor_mom["tumbuh"] = 0
     return [sektor_yoy, sektor_mom]
 
 
@@ -563,4 +576,4 @@ def cluster(filter, filter22, kpp):
 
 
 if __name__ == "__main__":
-    cluster()
+    sektor_yoy()

@@ -227,3 +227,64 @@ table
                 font=dict(size=26),
             ),
         )
+
+# Per Sektor Butterfly
+sektor_chart = make_subplots(
+        rows=1,
+        cols=2,
+        shared_yaxes=True,
+        horizontal_spacing=0,
+    )
+    sektor23 = go.Bar(
+        x=data_sektor["2023"] / 1000000000,
+        y=data_sektor["NM_KATEGORI"],
+        name="2023",
+        orientation="h",
+        text=data_sektor["kontrib_persen23"],
+        texttemplate="%{x:,.1f}M <br> (%{text})",
+        textposition="auto",
+        marker=dict(color="#005FAC"),
+        textangle=0,
+        base=0,
+    )
+
+    sektor22 = go.Bar(
+        x=data_sektor["2022"] / 1000000000,
+        y=data_sektor["NM_KATEGORI"],
+        name="2022",
+        orientation="h",
+        text=data_sektor["kontrib_persen22"],
+        textposition="auto",
+        texttemplate="%{x:,.1f}M<br> (%{text})",
+        marker=dict(color="#ffc91b"),
+        textangle=0,
+        base=0,
+    )
+    sektor_data = [sektor22, sektor23]
+    sektor_layout = go.Layout(barmode="group")
+    sektor_bar = go.Figure(data=sektor_data, layout=sektor_layout)
+
+    # sektor_bar.update_xaxes(visible=False)
+
+    # kontribusi_bar = go.Bar(
+    #     x=data_sektor["kontribusi"],
+    #     y=data_sektor["NM_KATEGORI"],
+    #     name="kontribusi",
+    #     orientation="h",
+    #     text=data_sektor["kontrib_persen"],
+    #     textposition="auto",
+    #     marker=dict(color="#499894"),
+    #     textangle=0,
+    #     base=0,
+    #     showlegend=False,
+    # )
+    # kontrib_layout = go.Layout()
+    # kontribusi_chart = go.Figure(data=kontribusi_bar, layout=kontrib_layout)
+
+    # kontribusi_chart.update_xaxes(visible=False)
+    sektor_chart.add_trace(sektor_bar.data[0], row=1, col=1)
+    sektor_chart.add_trace(sektor_bar.data[1], row=1, col=2)
+    sektor_chart.update_xaxes(
+        row=1, col=1, showticklabels=False
+    )  # autorange="reversed"
+    sektor_chart.update_xaxes(row=1, col=2, showticklabels=False)

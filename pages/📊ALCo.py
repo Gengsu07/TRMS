@@ -169,6 +169,9 @@ else:
                             yaxis={"visible": False},
                             xaxis={"visible": False},
                             margin=dict(l=0, r=0, t=0, b=0),
+                            paper_bgcolor="rgba(0, 0, 0, 0)",
+                            plot_bgcolor="rgba(0, 0, 0, 0)",
+                            autosize=True,
                         )
                         st.plotly_chart(spark, use_container_width=True)
                         st.metric(

@@ -1,8 +1,6 @@
 version: "3"
 services:
   trms:
-    build: .
+    image: sugengw07/trms
     ports:
       - 8501:8501
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
