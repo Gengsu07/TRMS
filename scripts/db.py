@@ -13,7 +13,7 @@ dict_sektor = {
     "KEGIATAN BADAN INTERNASIONAL DAN BADAN EKSTRA INTERNASIONAL LAINNYA": "KEGIATAN BADAN INTERNASIONAL",
     "JASA PERSEWAAN, KETENAGAKERJAAN, AGEN PERJALANAN DAN PENUNJANG USAHA LAINNYA": "JASA PERSEWAAN, KETENAGAKERJAAN",
     "JASA PERORANGAN YANG MELAYANI RUMAH TANGGA; KEGIATAN YANG MENGHASILKAN BARANG DAN JASA OLEH RUMAH TANGGA YANG DIGUNAKAN SENDIRI UNTUK MEMENUHI KEBUTUHAN": "JASA PERORANGAN MELAYANI<br>RUMAH TANGGA",
-    "ADMINISTRASI PEMERINTAHAN DAN JAMINAN SOSIAL WAJIB": "ADMINISTRASI PEMERINTAHAN<br>JAMINAN SOSIAL WAJIB",
+    "ADMINISTRASI PEMERINTAHAN, PERTAHANAN DAN JAMINAN SOSIAL WAJIB": "ADMINISTRASI PEMERINTAHAN<br>JAMINAN SOSIAL WAJIB",
     "JASA PENDIDIKAN": "JASA PENDIDIKAN",
     "INFORMASI DAN KOMUNIKASI": "INFORMASI KOMUNIKASI",
     "TRANSPORTASI DAN PERGUDANGAN": "TRANSPORTASI DAN PERGUDANGAN",
@@ -151,15 +151,16 @@ def sektor_yoy(filter, filter2, includewp: bool):
         """
         data = conn.query(kueri)
         # if data["NOMINAL"].sum() > 0:
-        data["NM_KATEGORI"] = data["NM_KATEGORI"].map(dict_sektor)
+        # data["NM_KATEGORI"] = data["NM_KATEGORI"].map(dict_sektor)
         data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
 
         sektor_yoy = data.pivot_table(
             index=["NAMA_WP", "NM_KATEGORI"], columns="TAHUNBAYAR", values="NOMINAL"
         ).reset_index()
-        # data.columns = [x.strip() for x in data.columns]
+        data.columns = [x.strip() for x in data.columns]
 
         sektor_yoy = sektor_yoy.sort_values(by="2023", ascending=False)
+
         sektor_yoy["selisih"] = sektor_yoy["2023"] - sektor_yoy["2022"]
         sektor_yoy["tumbuh"] = sektor_yoy["selisih"] / sektor_yoy["2022"]
 
@@ -235,11 +236,11 @@ def sektor2023(filter):
 def klu(filter):
     kueri = f""" 
         SELECT
-        p."NM_KATEGORI",p."NM_KLU" ,sum(p."NOMINAL") as "BRUTO"
+        p."NM_KATEGORI",p."NAMA_KLU" ,sum(p."NOMINAL") as "BRUTO"
         FROM 
         ppmpkm p
         WHERE  p."KET" !='SPMKP' and {filter}
-        GROUP BY p."NM_KATEGORI",p."NM_KLU" 
+        GROUP BY p."NM_KATEGORI",p."NAMA_KLU" 
         ORDER BY sum(p."NOMINAL")"""
     klu = conn.query(kueri)
     return klu

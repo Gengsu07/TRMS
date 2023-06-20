@@ -453,6 +453,7 @@ elif st.session_state["authentication_status"]:
 
     data_sektor_awal = sektor_yoy(filter, filter22, includewp=True)
     data_sektor_awal = data_sektor_awal[0]
+
     data_sektor_chart = (
         data_sektor_awal.groupby("NM_KATEGORI")
         .sum()
@@ -623,9 +624,9 @@ elif st.session_state["authentication_status"]:
     )
     kluchart = px.treemap(
         klu,
-        labels="NM_KLU",
+        labels="NAMA_KLU",
         values="BRUTO_M",
-        path=["NM_KLU"],
+        path=["NAMA_KLU"],
         color="NM_KATEGORI",
         color_discrete_sequence=px.colors.qualitative.Safe,
         height=560,
@@ -634,7 +635,7 @@ elif st.session_state["authentication_status"]:
     )
     kluchart.update_traces(
         hovertemplate="<b>%{label}</b>(%{customdata[0]})<br><br>"
-        + "NM KLU: %{id}<br>"
+        + "NAMA KLU: %{id}<br>"
         + "BRUTO: %{value:,.1f}M <extra></extra>"
     )
 
