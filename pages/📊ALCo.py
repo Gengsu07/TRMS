@@ -10,8 +10,11 @@ import plotly.figure_factory as ff
 import plotly.express as px
 from math import ceil
 import plotly.graph_objects as go
-from scripts.db import sektor_yoy, growth_month
+from scripts.db import sektor_yoy, growth_month, subsektor
 
+
+if "darkmode" not in st.session_state:
+    st.session_state["darkmode"] = "off"
 
 if st.session_state["darkmode"] == "on":
     with open("style/pages_alco_darkmode.css") as f:
@@ -76,14 +79,19 @@ def format_number(x):
     return number
 
 
+if "authentication_status" not in st.session_state:
+    st.session_state["authentication_status"] = None
+
 if st.session_state["authentication_status"] is None:
-    st.warning("Login Duluuu🚨🚨")
+    st.warning("🚨🚨Ke Beranda atau Login Duluuu🚨🚨")
 
 else:
     with st.sidebar:
         add_logo("assets/unit.png", height=150)
         st.text(f"Salam Satu Bahu {st.session_state['name']}")
-
+        urutan = st.radio(
+            "Urut Berdasarkan:", options=["2023", "2022", "tumbuh"], horizontal=True
+        )
         mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
         start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
         end = st.date_input("Tgl Akhir", max_value=date.today())
@@ -112,18 +120,19 @@ else:
     filter22 = "and".join(x for x in filter_gabungan[1])
 
     # Main apps
-    st.subheader(f"Pertumbuhan Tahunan(Bruto) {start} s.d. {end}")
-
     style_metric_cards(
-        background_color="#FFFFFF", border_color="#ffffff", border_left_color="#ffffff"
+        background_color="rgba(0,0,0,0)",
+        border_color="rgba(0,0,0,0)",
+        border_left_color="rgba(0,0,0,0)",
     )
 
     # SEKTORRRR CARD
     sektor = sektor_yoy(filter, filter22, includewp=False)
-    sektor_yoy, sektor_mom = sektor
+    *_, sektor_mom, sektor_yoy = sektor
+
+    # st.dataframe(sektor)
     sektor_yoy["%kontribusi"] = (sektor_yoy["2023"] / sektor_yoy["2023"].sum()) * 100
 
-    urutan = st.selectbox("Urut Berdasarkan:", options=["2023", "2022", "tumbuh"])
     sektor_yoy1 = sektor_yoy[sektor_yoy["NM_KATEGORI"] != "KLU ERROR"]
     sektor_yoy["rank"] = sektor_yoy[f"{urutan}"].rank(ascending=False)
 
@@ -136,7 +145,7 @@ else:
 
     # CONTAINER SEKTOR SURPLUS
     rows = ceil(len(sektor_plus) / 4)
-    st.subheader("💡 Sektor Surplus")
+    st.subheader(f"💡 Sektor Surplus {start} s.d. {end}")
     container = {}
     counter = 1
     for row in range(1, rows + 1):
@@ -161,17 +170,25 @@ else:
                         sektor_mom_select = sektor_mom[
                             sektor_mom["NM_KATEGORI"] == gridkat
                         ]
-                        sektor_mom_select = sektor_mom_select.groupby("BULANBAYAR")[
-                            "NOMINAL"
-                        ].sum()
+                        sektor_mom_select.drop(columns="NM_KATEGORI", inplace=True)
+                        sektor_mom_select = (
+                            sektor_mom_select.groupby("BULANBAYAR").sum().reset_index()
+                        )
+                        sektor_mom_select = sektor_mom_select.melt(
+                            id_vars="BULANBAYAR", value_name="NOMINAL"
+                        )
+                        # st.dataframe(sektor_mom_select)
                         spark = px.line(
                             sektor_mom_select,
-                            x=sektor_mom_select.index,
+                            x="BULANBAYAR",
                             y="NOMINAL",
+                            color="TAHUNBAYAR",
                             markers=True,
                             height=100,
                             width=200,
+                            # color_discrete_sequence=["#ffc91b", "#005FAC"],
                         )
+
                         spark.update_layout(
                             template=None,
                             xaxis_title="",
@@ -182,6 +199,7 @@ else:
                             paper_bgcolor="rgba(0, 0, 0, 0)",
                             plot_bgcolor="rgba(0, 0, 0, 0)",
                             autosize=True,
+                            showlegend=False,
                         )
                         st.plotly_chart(spark, use_container_width=True)
                         st.metric(
@@ -194,7 +212,7 @@ else:
 
     # SEKTOR MINUS
     rows = ceil(len(sektor_min) / 4)
-    st.subheader("💡 Sektor Shortfall")
+    st.subheader(f"💡 Sektor Shortfall {start} s.d. {end}")
     container = {}
     counter = 1
     for row in range(1, rows + 1):
@@ -221,13 +239,19 @@ else:
                         sektor_mom_select = sektor_mom[
                             sektor_mom["NM_KATEGORI"] == gridkat
                         ]
-                        sektor_mom_select = sektor_mom_select.groupby("BULANBAYAR")[
-                            "NOMINAL"
-                        ].sum()
+                        sektor_mom_select.drop(columns="NM_KATEGORI", inplace=True)
+                        sektor_mom_select = (
+                            sektor_mom_select.groupby("BULANBAYAR").sum().reset_index()
+                        )
+                        sektor_mom_select = sektor_mom_select.melt(
+                            id_vars="BULANBAYAR", value_name="NOMINAL"
+                        )
+
                         spark = px.line(
                             sektor_mom_select,
-                            x=sektor_mom_select.index,
+                            x="BULANBAYAR",
                             y="NOMINAL",
+                            color="TAHUNBAYAR",
                             markers=True,
                             height=100,
                             width=200,
@@ -239,6 +263,10 @@ else:
                             yaxis={"visible": False},
                             xaxis={"visible": False},
                             margin=dict(l=0, r=0, t=0, b=0),
+                            paper_bgcolor="rgba(0, 0, 0, 0)",
+                            plot_bgcolor="rgba(0, 0, 0, 0)",
+                            autosize=True,
+                            showlegend=False,
                         )
                         st.plotly_chart(spark, use_container_width=True)
                         st.metric(
@@ -255,8 +283,29 @@ else:
 
     # SUBSEKTOR---------------------------------------------------------------------------
     st.subheader("🚧 SubSektor(under construction)🚧")
+    data_subsektor = subsektor(filter, filter22)
+    with chart_container(data_subsektor):
+        nama_sektor = data_subsektor["NM_KATEGORI"].unique().tolist()
+        tab_subsekstor = st.selectbox("Pilih Sektor:", nama_sektor)
 
-    st.dataframe()
+        subsektor_df = data_subsektor[data_subsektor["NM_KATEGORI"] == tab_subsekstor]
+        subsektor_table = subsektor_df.drop(columns=["NM_KATEGORI", "NAMA_KLU"])
+        subsektor_table = subsektor_table.groupby("Sub Sektor").sum().reset_index()
+        subsektor_table["Selisih"] = subsektor_table["2023"] - subsektor_table["2022"]
+        subsektor_table["Tumbuh"] = (
+            subsektor_table["Selisih"] / subsektor_table["2022"]
+        ) * 100
+
+        klu_df = subsektor_df.drop(columns=["NM_KATEGORI"])
+        klu_df = klu_df.groupby("NAMA_KLU").sum().reset_index()
+        klu_df["Selisih"] = klu_df["2023"] - klu_df["2022"]
+        klu_df["Tumbuh"] = (klu_df["Selisih"] / klu_df["2022"]) * 100
+        # # subsektor_df.loc[:,'2022']
+        # colorscale = [[0, "#005FAC"], [0.5, "#f2e5ff"], [1, "#ffffff"]]
+        # subsektor_df = ff.create_table(subsektor_df, colorscale=colorscale)
+
+        st.dataframe(subsektor_table, use_container_width=True)
+        st.dataframe(klu_df, use_container_width=True)
     # TUMBUH BULANAN-----------------------------------------------------------------------
     st.subheader("💡 Pertumbuhan Bulanan")
     tumbuh_bulanan = growth_month(filter, filter22)
@@ -270,8 +319,7 @@ else:
     )
 
     with chart_container(tumbuh_bulanan):
-        colorscale = [[0, "#005FAC"], [0.5, "#f2e5ff"], [1, "#ffffff"]]
-
+        colorscale = [[0, "#2c5a7b"], [0.5, "#f2e5ff"], [1, "#ffffff"]]
         tumbuh = ff.create_table(tumbuh_bulanan, colorscale=colorscale)
 
         st.plotly_chart(tumbuh, use_container_width=True)

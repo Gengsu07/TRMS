@@ -14,8 +14,8 @@
 [data-testid="stSidebar"] {
   background-color: #44475a;
   border: 2px solid rgba(212, 203, 203, 0.5);
-  box-shadow: 0 0 10px rgba(212, 203, 203, 0.5);
-  border-radius: 8px;
+  box-shadow: 0 0 3px rgba(212, 203, 203, 0.5);
+  border-radius: 3px;
 }
 
 div.css-zt5igj {
@@ -58,10 +58,10 @@ div.css-zt5igj {
 }
 
 [data-testid="column"] {
-  border: 2px solid rgb(212, 203, 203);
+  border: 1px solid rgb(212, 203, 203);
   padding: 0.1rem 0.3rem 0.1rem 0.3rem;
-  box-shadow: 0 0 10px rgba(212, 203, 203, 0.5);
-  border-radius: 8px;
+  box-shadow: 0 0 3px rgba(212, 203, 203, 0.5);
+  border-radius: 3px;
   margin-top: 1rem;
 }
 
@@ -69,9 +69,9 @@ div.css-zt5igj {
     background-color:#005FAC ;
   } */
 
-div.css-1629p8f.eqr7zpz1 {
+/* div.css-1629p8f.eqr7zpz1 {
   background-color: #005fac;
-}
+} */
 div.css-zt5igj.eqr7zpz3 {
   color: white;
   align-items: center;
@@ -160,4 +160,14 @@ div.css-j5r0tf.esravye1 {
 
 footer {
   visibility: hidden;
+}
+
+div[data-testid="metric-container"] {
+  background-color: transparent;
+}
+.css-wvv94f {
+  color: #fff;
+}
+.css-1wivap2 {
+  color: white;
 }

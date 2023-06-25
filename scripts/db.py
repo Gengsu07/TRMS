@@ -6,27 +6,29 @@ import streamlit as st
 
 conn = st.experimental_connection("ppmpkm", type="sql")
 dict_sektor = {
-    "PERDAGANGAN BESAR DAN ECERAN; REPARASI DAN PERAWATAN MOBIL DAN SEPEDA MOTOR": "PERDAGANGAN BESAR ECERAN <br> REPARASI PERAWATAN MOBIL",
-    "PENYEDIAAN AKOMODASI DAN PENYEDIAAN MAKAN MINUM": "PENYEDIAAN AKOMODASI<br>DAN PENYEDIAAN MAKAN MINUM",
-    "PENGADAAN LISTRIK, GAS,UAP/AIR PANAS DAN UDARA DINGIN": "PENGADAAN LISTRIK, GAS,UAP/AIR PANAS<br>UDARA DINGIN",
-    "PENGADAAN AIR, PENGELOLAAN SAMPAH DAN DAUR ULANG, PEMBUANGAN DAN PEMBERSIHAN LIMBAH DAN SAMPAH": "PENGADAAN AIR, PENGELOLAAN SAMPAH",
-    "KEGIATAN BADAN INTERNASIONAL DAN BADAN EKSTRA INTERNASIONAL LAINNYA": "KEGIATAN BADAN INTERNASIONAL",
-    "JASA PERSEWAAN, KETENAGAKERJAAN, AGEN PERJALANAN DAN PENUNJANG USAHA LAINNYA": "JASA PERSEWAAN, KETENAGAKERJAAN",
-    "JASA PERORANGAN YANG MELAYANI RUMAH TANGGA; KEGIATAN YANG MENGHASILKAN BARANG DAN JASA OLEH RUMAH TANGGA YANG DIGUNAKAN SENDIRI UNTUK MEMENUHI KEBUTUHAN": "JASA PERORANGAN MELAYANI<br>RUMAH TANGGA",
-    "ADMINISTRASI PEMERINTAHAN, PERTAHANAN DAN JAMINAN SOSIAL WAJIB": "ADMINISTRASI PEMERINTAHAN<br>JAMINAN SOSIAL WAJIB",
-    "JASA PENDIDIKAN": "JASA PENDIDIKAN",
-    "INFORMASI DAN KOMUNIKASI": "INFORMASI KOMUNIKASI",
-    "TRANSPORTASI DAN PERGUDANGAN": "TRANSPORTASI DAN PERGUDANGAN",
-    "JASA KESEHATAN DAN KEGIATAN SOSIAL": "JASA KESEHATAN DAN KEGIATAN SOSIAL",
+    "PERTANIAN, KEHUTANAN DAN PERIKANAN": "PERTANIAN, KEHUTANAN DAN PERIKANAN",
+    "PEJABAT NEGARA, KARYAWAN, PENSIUNAN, TIDAK/BELUM BEKERJA": "PEJABAT NEGARA, KARYAWAN, PENSIUNAN",
+    "AKTIVITAS PROFESIONAL, ILMIAH DAN TEKNIS": "AKTIVITAS PROFESIONAL, ILMIAH DAN TEKNIS",
+    "AKTIVITAS JASA LAINNYA": "AKTIVITAS JASA LAINNYA",
+    "AKTIVITAS BADAN INTERNASIONAL DAN BADAN EKSTRA INTERNASIONAL LAINNYA": "BADAN INTER DAN EXTRA INTERNASIONAL",
+    "INFORMASI DAN KOMUNIKASI": "INFORMASI DAN KOMUNIKASI",
+    "PENGADAAN LISTRIK, GAS, UAP/AIR PANAS DAN UDARA DINGIN": "PENGADAAN LISTRIK, GAS, UAP/AIR PANAS DAN UDARA DINGIN",
+    "ADMINISTRASI PEMERINTAHAN, PERTAHANAN DAN JAMINAN SOSIAL WAJIB": "ADMIN. PEMERINTAHAN & JAMINAN SOSIAL",
+    "PERDAGANGAN BESAR DAN ECERAN; REPARASI DAN PERAWATAN MOBIL DAN SEPEDA MOTOR": " PERDAGANGAN BESAR ECERAN & PERAWATAN MOBIL",
+    "AKTIVITAS KEUANGAN DAN ASURANSI": "AKTIVITAS KEUANGAN DAN ASURANSI",
     "KONSTRUKSI": "KONSTRUKSI",
+    "AKTIVITAS KESEHATAN MANUSIA DAN AKTIVITAS SOSIAL": "KESEHATAN MANUSIA & AKTIVITAS SOSIAL",
+    "TREATMENT AIR, TREATMENT AIR LIMBAH, TREATMENT DAN PEMULIHAN MATERIAL SAMPAH, DAN AKTIVITAS REMEDIASI": "TREATMENT AIR,LIMBAH",
+    "PENDIDIKAN": "PENDIDIKAN",
+    "KESENIAN, HIBURAN DAN REKREASI": "KESENIAN, HIBURAN DAN REKREASI",
+    "PENGANGKUTAN DAN PERGUDANGAN": "PENGANGKUTAN DAN PERGUDANGAN",
     "REAL ESTAT": "REAL ESTAT",
-    "KEGIATAN JASA LAINNYA": "KEGIATAN JASA LAINNYA",
+    "": "",
     "INDUSTRI PENGOLAHAN": "INDUSTRI PENGOLAHAN",
-    "KLU ERROR": "KLU ERROR",
+    "PENYEDIAAN AKOMODASI DAN PENYEDIAAN MAKAN MINUM": "PENYEDIAAN AKOMODASI DAN PENYEDIAAN MAKAN MINUM",
     "PERTAMBANGAN DAN PENGGALIAN": "PERTAMBANGAN DAN PENGGALIAN",
-    "JASA KEUANGAN DAN ASURANSI": "JASA KEUANGAN DAN ASURANSI",
-    "PERTANIAN, KEHUTANAN DAN PERIKANAN": "PERTANIAN,KEHUTANAN,PERIKANAN",
-    "JASA PROFESIONAL, ILMIAH DAN TEKNIS": "JASA PROFESIONAL,ILMIAH,TEKNIS",
+    "AKTIVITAS PENYEWAAN DAN SEWA GUNA USAHA TANPA HAK OPSI, KETENAGAKERJAAN, AGEN PERJALANAN DAN PENUNJANG USAHA LAINNYA": "PENYEWAAN & SGU TANPA HAK OPSI",
+    "AKTIVITAS RUMAH TANGGA SEBAGAI PEMBERI KERJA; AKTIVITAS YANG MENGHASILKAN BARANG DAN JASA OLEH RUMAH TANGGA YANG DIGUNAKAN UNTUK MEMENUHI KEBUTUHAN SENDIRI": "RUMAH TANGGA PEMBERI KERJA",
 }
 target2023 = {
     "001": 608265424000,
@@ -50,6 +52,19 @@ target2022 = {
     "009": 1200824695000,
     "097": 7892063178000,
 }
+
+
+def format_angka(value):
+    cek = value / 1000
+    if (cek > 1000000000) or (cek < -1000000000):  # >1 1T
+        nominal = "{:,.2f}T".format(value / 1000000000000)
+    elif (cek > 1000000) or (cek < -1000000):  # >1M
+        nominal = "{:,.2f}M".format(value / 1000000000)
+    elif (cek > 1000) or (cek < -1000):  # > 1Jt
+        nominal = "{:,.2f}Jt".format(value / 1000000)
+    else:
+        nominal = "{:,.0f}".format(value)
+    return nominal
 
 
 @st.cache_data
@@ -115,7 +130,7 @@ def sektor(filter):
         FROM (
                 SELECT 
                 p."NM_KATEGORI" , 
-                sum(CASE WHEN p."KET" != 'SPMKP' THEN p."NOMINAL" END ) AS "BRUTO",
+                sum(CASE WHEN p."KET" in('MPN','SPM') THEN p."NOMINAL" END ) AS "BRUTO",
                 sum(p."NOMINAL") AS "NETTO" 
                 FROM 
                 public.ppmpkm p 
@@ -132,58 +147,59 @@ def sektor(filter):
 
 
 @st.cache_data
-def sektor_yoy(filter, filter2, includewp: bool):
+def sektor_yoy(filter, filter22, includewp: bool):
     if includewp:
         kueri = f"""
         SELECT p."NAMA_WP",
-        p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR", sum(p."NOMINAL") AS "NOMINAL"
+        p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP", sum(p."NOMINAL") AS "NOMINAL"
         FROM 
         ppmpkm p 
-        WHERE p."KET" !='SPMKP' and {filter}
-        GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR"
+        WHERE p."KET" in('MPN','SPM') and {filter}
+        GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
         UNION ALL 
         SELECT p."NAMA_WP",
-        p."NM_KATEGORI" , p."TAHUNBAYAR",p."BULANBAYAR", sum(p."NOMINAL") AS "NOMINAL"
+        p."NM_KATEGORI" , p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP", sum(p."NOMINAL") AS "NOMINAL"
         FROM 
         ppmpkm p 
-        WHERE p."KET" !='SPMKP' and {filter2}
-        GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR"
+        WHERE p."KET" in('MPN','SPM') and {filter22}
+        GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
         """
         data = conn.query(kueri)
         # if data["NOMINAL"].sum() > 0:
-        # data["NM_KATEGORI"] = data["NM_KATEGORI"].map(dict_sektor)
+        data["NM_KATEGORI"] = data["NM_KATEGORI"].map(dict_sektor)
         data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
 
         sektor_yoy = data.pivot_table(
-            index=["NAMA_WP", "NM_KATEGORI"], columns="TAHUNBAYAR", values="NOMINAL"
+            index=["NAMA_WP", "NM_KATEGORI", "JENIS_WP"],
+            columns="TAHUNBAYAR",
+            values="NOMINAL",
+            aggfunc="sum",
         ).reset_index()
-        data.columns = [x.strip() for x in data.columns]
 
-        sektor_yoy = sektor_yoy.sort_values(by="2023", ascending=False)
+        sektor_yoy["selisih"] = round(sektor_yoy["2023"] - sektor_yoy["2022"], 0)
+        sektor_yoy["tumbuh"] = (sektor_yoy["selisih"] / sektor_yoy["2022"]) * 100
 
-        sektor_yoy["selisih"] = sektor_yoy["2023"] - sektor_yoy["2022"]
-        sektor_yoy["tumbuh"] = sektor_yoy["selisih"] / sektor_yoy["2022"]
-
-        sektor_mom = data[data["TAHUNBAYAR"] == 2023]
-        sektor_mom = (
-            data.groupby(["NAMA_WP", "NM_KATEGORI", "BULANBAYAR"])["NOMINAL"]
-            .sum()
-            .reset_index()
-        )
+        # sektor_mom = data[data["TAHUNBAYAR"] == 2023]
+        sektor_mom = data.pivot_table(
+            index=["NM_KATEGORI", "BULANBAYAR"],
+            columns="TAHUNBAYAR",
+            values="NOMINAL",
+            aggfunc="sum",
+        ).reset_index()
     else:
         kueri = f"""
         SELECT 
         p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR", sum(p."NOMINAL") AS "NOMINAL"
         FROM 
         ppmpkm p 
-        WHERE p."KET" !='SPMKP' and {filter}
+        WHERE p."KET" in('MPN','SPM') and {filter}
         GROUP BY p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR"
         UNION ALL 
         SELECT 
         p."NM_KATEGORI" , p."TAHUNBAYAR",p."BULANBAYAR", sum(p."NOMINAL") AS "NOMINAL"
         FROM 
         ppmpkm p 
-        WHERE p."KET" !='SPMKP' and {filter2}
+        WHERE p."KET" in('MPN','SPM') and {filter22}
         GROUP BY p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR"
         """
         data = conn.query(kueri)
@@ -192,31 +208,57 @@ def sektor_yoy(filter, filter2, includewp: bool):
         data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
 
         sektor_yoy = data.pivot_table(
-            index=["NM_KATEGORI"], columns="TAHUNBAYAR", values="NOMINAL"
+            index=["NM_KATEGORI"], columns="TAHUNBAYAR", values="NOMINAL", aggfunc="sum"
         ).reset_index()
-        # data.columns = [x.strip() for x in data.columns]
 
         sektor_yoy = sektor_yoy.sort_values(by="2023", ascending=False)
-        sektor_yoy["selisih"] = sektor_yoy["2023"] - sektor_yoy["2022"]
-        sektor_yoy["tumbuh"] = sektor_yoy["selisih"] / sektor_yoy["2022"]
+        sektor_yoy["selisih"] = round(sektor_yoy["2023"] - sektor_yoy["2022"], 0)
+        sektor_yoy["tumbuh"] = (sektor_yoy["selisih"] / sektor_yoy["2022"]) * 100
 
-        sektor_mom = data[data["TAHUNBAYAR"] == 2023]
-        sektor_mom = (
-            data.groupby(["NM_KATEGORI", "BULANBAYAR"])["NOMINAL"].sum().reset_index()
-        )
-    # else:
-    #     sektor_yoy = pd.DataFrame(
-    #         [["", "", "", ""]], columns=["NAMA_WP", "NM_KATEGORI", "2023", "2022"]
-    #     )
-    #     sektor_yoy["selisih"] = 0
-    #     sektor_yoy["tumbuh"] = 0
-    #     sektor_mom = pd.DataFrame(
-    #         [["", "", "", ""]], columns=["NAMA_WP", "NM_KATEGORI", "2023", "2022"]
-    #     )
-    #     sektor_mom["selisih"] = 0
-    #     sektor_mom["tumbuh"] = 0
+        sektor_mom = data.pivot_table(
+            index=["NM_KATEGORI", "BULANBAYAR"],
+            columns="TAHUNBAYAR",
+            values="NOMINAL",
+            aggfunc="sum",
+        ).reset_index()
+    sektor_yoy9 = sektor_yoy.nlargest(10, "2023")
+    sektor_yoy9 = sektor_yoy9.assign(
+        text22=sektor_yoy9["2022"].apply(lambda x: format_angka(x)),
+        text23=sektor_yoy9["2023"].apply(lambda x: format_angka(x)),
+        kontribusi_2023=(sektor_yoy9["2023"] / sektor_yoy["2023"].sum()) * 100,
+        kontribusi_2022=(sektor_yoy9["2022"] / sektor_yoy["2022"].sum()) * 100,
+    )
+    sektor_yoy9 = sektor_yoy9.assign(
+        kontrib2023=sektor_yoy9["kontribusi_2023"].apply(lambda x: "{:,.1f}%".format(x))
+    ).assign(
+        kontrib2022=sektor_yoy9["kontribusi_2022"].apply(lambda x: "{:,.1f}%".format(x))
+    )
 
-    return [sektor_yoy, sektor_mom]
+    sektor_yoy9.sort_values(by="2023", ascending=True, inplace=True)
+    sektor_yoy9["tumbuh"] = sektor_yoy9["tumbuh"].apply(lambda x: "{:,.1f}%".format(x))
+
+    # sektor yoy[2]
+    sektor_yoy = sektor_yoy.assign(
+        kontribusi_2023=round((sektor_yoy["2023"] / sektor_yoy["2023"].sum()) * 100, 2),
+        kontribusi_2022=round((sektor_yoy["2022"] / sektor_yoy["2022"].sum()) * 100, 2),
+    )
+    sektor_yoy["2023"] = round(sektor_yoy["2023"], 0)
+    sektor_yoy["2022"] = round(sektor_yoy["2022"], 0)
+    # sektor_yoy = sektor_yoy.assign(
+    #     kontrib2023=sektor_yoy["kontribusi_2023"].apply(
+    #         lambda x: "{:,.1f}%".format(x * 100)
+    #     ),
+    #     kontrib2022=sektor_yoy["kontribusi_2022"].apply(
+    #         lambda x: "{:,.1f}%".format(x * 100)
+    #     ),
+    # )
+    sektor_yoy["tumbuh"] = round(sektor_yoy["tumbuh"].fillna(0), 2)
+    # sektor_yoy["tumbuh"] = sektor_yoy["tumbuh"].apply(
+    #     lambda x: "{:,.1f}%".format(x * 100)
+    # )
+
+    sektor_yoy = sektor_yoy.sort_values(by="2023", ascending=False)
+    return [sektor_yoy9, sektor_mom, sektor_yoy]
 
 
 @st.cache_data
@@ -226,7 +268,7 @@ def sektor2023(filter):
     p."DATEBAYAR",p."NM_KATEGORI" , sum(p."NOMINAL") AS "NOMINAL"
     FROM 
     ppmpkm p 
-    WHERE p."KET" !='SPMKP' and {filter}
+    WHERE p."KET" in('MPN','SPM') and {filter}
     GROUP BY p."DATEBAYAR",p."NM_KATEGORI" 
     """
     sektor2023 = conn.query(kueri)
@@ -239,36 +281,109 @@ def klu(filter):
         p."NM_KATEGORI",p."NAMA_KLU" ,sum(p."NOMINAL") as "BRUTO"
         FROM 
         ppmpkm p
-        WHERE  p."KET" !='SPMKP' and {filter}
+        WHERE  p."KET" in('MPN','SPM') and {filter}
         GROUP BY p."NM_KATEGORI",p."NAMA_KLU" 
         ORDER BY sum(p."NOMINAL")"""
     klu = conn.query(kueri)
     return klu
 
 
-def jenis_pajak(filter, filter22):
+def jns_pajak(filter, filter22, includewp: bool):
     kueri = f"""
     SELECT 
-    p."MAP" , p."TAHUNBAYAR",sum(p."NOMINAL") AS "BRUTO" 
+    p."NAMA_WP",p."MAP" , p."TAHUNBAYAR",p."JENIS_WP",sum(p."NOMINAL") AS "BRUTO" 
     FROM 
     public.ppmpkm p 
-    WHERE {filter} and p."KET" !='SPMKP'
-    GROUP BY p."MAP" ,p."TAHUNBAYAR"
+    WHERE {filter} and p."KET" in('MPN','SPM')
+    GROUP BY p."NAMA_WP", p."MAP" ,p."TAHUNBAYAR",p."JENIS_WP"
     UNION ALL
     SELECT 
-    p."MAP" , p."TAHUNBAYAR", sum(p."NOMINAL") AS "BRUTO" 
+    p."NAMA_WP",p."MAP" , p."TAHUNBAYAR",p."JENIS_WP", sum(p."NOMINAL") AS "BRUTO" 
     FROM 
     public.ppmpkm p 
-    WHERE {filter22} and p."KET" !='SPMKP'
-    GROUP BY p."MAP" ,p."TAHUNBAYAR" 
+    WHERE {filter22} and p."KET" in('MPN','SPM')
+    GROUP BY p."NAMA_WP",p."MAP" ,p."TAHUNBAYAR" ,p."JENIS_WP"
     """
     jenis = conn.query(kueri)
-    jenis = jenis.groupby(["MAP", "TAHUNBAYAR"])["BRUTO"].sum().reset_index()
-    jenis["TAHUNBAYAR"] = jenis["TAHUNBAYAR"].astype("str")
-    # jenis = pd.pivot_table(jenis, index="MAP", columns="TAHUNBAYAR", values="BRUTO")
-    # jenis.drop(columns="index", inplace=True)
+    if includewp:
+        jenis_wp = (
+            jenis.groupby(["NAMA_WP", "MAP", "TAHUNBAYAR", "JENIS_WP"])["BRUTO"]
+            .sum()
+            .reset_index()
+        )
+        jenis_wp["TAHUNBAYAR"] = jenis_wp["TAHUNBAYAR"].astype("str")
+        jenis_wp = pd.pivot_table(
+            jenis_wp,
+            index=["NAMA_WP", "MAP", "JENIS_WP"],
+            columns="TAHUNBAYAR",
+            values="BRUTO",
+            aggfunc="sum",
+        )
+        jenis_wp = (
+            jenis_wp.assign(
+                TUMBUH=round(
+                    ((jenis_wp["2023"] - jenis_wp["2022"]) / jenis_wp["2022"] * 100),
+                    2,
+                )
+            )
+            .assign(
+                KONTRIBUSI2023=round(
+                    (jenis_wp["2023"] / jenis_wp["2023"].sum() * 100), 2
+                )
+            )
+            .assign(
+                KONTRIBUSI2022=round(
+                    (jenis_wp["2022"] / jenis_wp["2022"].sum() * 100), 2
+                )
+            )
+            .sort_values(by="2023", ascending=False)
+        )
+        jenis_wp9 = jenis_wp.nlargest(10, "2023")
 
-    return jenis
+        jenis_wp9 = jenis_wp9.assign(
+            tbruto=jenis_wp9["2023"].apply(lambda x: "{:,.1f}M".format(x / 1000000000))
+        )
+        jenis_wp9 = jenis_wp9.sort_values(by="2023", ascending=True)
+        return [jenis_wp, jenis_wp9]
+
+    else:
+        jenis_nwp = jenis.groupby(["MAP", "TAHUNBAYAR"])["BRUTO"].sum().reset_index()
+        jenis_nwp["TAHUNBAYAR"] = jenis_nwp["TAHUNBAYAR"].astype("str")
+        jenis_nwp = pd.pivot_table(
+            jenis_nwp,
+            index=["MAP"],
+            columns="TAHUNBAYAR",
+            values="BRUTO",
+            aggfunc="sum",
+        )
+
+        jenis_nwp = (
+            jenis_nwp.assign(
+                TUMBUH=round(
+                    ((jenis_nwp["2023"] - jenis_nwp["2022"]) / jenis_nwp["2022"] * 100),
+                    2,
+                )
+            )
+            .assign(
+                KONTRIBUSI2023=round(
+                    (jenis_nwp["2023"] / jenis_nwp["2023"].sum() * 100), 2
+                )
+            )
+            .assign(
+                KONTRIBUSI2022=round(
+                    (jenis_nwp["2022"] / jenis_nwp["2022"].sum() * 100), 2
+                )
+            )
+            .sort_values(by="2023", ascending=False)
+        )
+
+        jenis_nwp9 = jenis_nwp.nlargest(10, "2023")
+
+        jenis_nwp9 = jenis_nwp9.assign(
+            tbruto=jenis_nwp9["2023"].apply(lambda x: "{:,.1f}M".format(x / 1000000000))
+        )
+        jenis_nwp9 = jenis_nwp9.sort_values(by="2023", ascending=True)
+        return [jenis_nwp, jenis_nwp9]
 
 
 def kjs(filter):
@@ -277,7 +392,7 @@ def kjs(filter):
         p."MAP",p."KDBAYAR" ,sum(p."NOMINAL") as "BRUTO"
         FROM 
         ppmpkm p
-        WHERE  p."KET" !='SPMKP' and {filter}
+        WHERE  p."KET" in('MPN','SPM') and {filter}
         GROUP BY p."MAP",p."KDBAYAR"  """
     kjs = conn.query(kueri)
     return kjs
@@ -287,7 +402,7 @@ def kjs(filter):
 def kpi(filter, filter22, filter_date, filter_date22):
     mpn23 = conn.query(
         f""" SELECT
-            sum( CASE WHEN p."KET" != 'SPMKP' THEN p."NOMINAL" END) AS "BRUTO" ,
+            sum( CASE WHEN p."KET" in('MPN','SPM') THEN p."NOMINAL" END) AS "BRUTO" ,
             sum( p."NOMINAL") AS "NETTO" ,
             (sum( p."NOMINAL" ) / 
             (
@@ -305,7 +420,7 @@ def kpi(filter, filter22, filter_date, filter_date22):
     )
     mpn22 = conn.query(
         f""" SELECT
-            sum( CASE WHEN p."KET" != 'SPMKP' THEN p."NOMINAL" END) AS "BRUTO" ,
+            sum( CASE WHEN p."KET" in('MPN','SPM') THEN p."NOMINAL" END) AS "BRUTO" ,
             sum( p."NOMINAL") AS "NETTO" ,
             (sum( p."NOMINAL") / 
             (
@@ -351,7 +466,7 @@ def naikturun(filter, filter22):
     FROM
         ppmpkm p
     WHERE
-        p."KET" !='SPMKP' AND {filter}
+        p."KET" in('MPN','SPM') AND {filter}
     GROUP BY
         p."NPWP",
         p."NAMA_WP",
@@ -365,7 +480,7 @@ def naikturun(filter, filter22):
     FROM
         ppmpkm p
     WHERE
-        p."KET" !='SPMKP' AND {filter22}
+        p."KET" in('MPN','SPM') AND {filter22}
     GROUP BY
         p."NPWP",
         p."NAMA_WP",
@@ -377,7 +492,7 @@ def naikturun(filter, filter22):
     #     data.groupby(["NPWP", "NAMA_WP", "TAHUNBAYAR"])["NOMINAL"].sum().reset_index()
     # )
     data = data.pivot_table(
-        index=["NPWP", "NAMA_WP"], columns="TAHUNBAYAR", values="NOMINAL"
+        index=["NPWP", "NAMA_WP"], columns="TAHUNBAYAR", values="NOMINAL", aggfunc="sum"
     ).reset_index()
 
     data["SELISIH"] = data["2023"] - data["2022"]
@@ -391,18 +506,20 @@ def proporsi(filter):
     kueri = f""" 
     select 
     p."NPWP",
-    p."NAMA_WP" , 
+    p."NAMA_WP" , p."JENIS_WP",
     sum(p."NOMINAL") as "BRUTO"
     from ppmpkm p 
     where p."KET" in('MPN','SPM') and {filter}
-    group by p."NPWP" ,p."NAMA_WP" 
+    group by p."NPWP" ,p."NAMA_WP"  , p."JENIS_WP"
     order by "BRUTO" desc
     """
-    bruto = conn.query(kueri)
+    bruto_raw = conn.query(kueri)
     # bruto_nol = bruto[bruto['NPWP'].str.startswith('00000000')]
-    row = bruto.shape[0] + 1
-    # rowplus = row-len(brutomin)
+    row = bruto_raw.shape[0] + 1
+    # # rowplus = row-len(brutomin)
 
+    bruto = bruto_raw.drop(columns="JENIS_WP")
+    bruto = bruto.groupby(["NPWP", "NAMA_WP"])["BRUTO"].sum().reset_index()
     bruto_a = bruto.nlargest(10, columns="BRUTO")
     bruto_b = pd.DataFrame(
         [["Penerimaan 10 WP Terbesar", bruto_a["BRUTO"].sum()]],
@@ -433,8 +550,8 @@ def proporsi(filter):
         axis=0,
         ignore_index=True,
     )
-    bruto_ok["KONTRIBUSI"] = bruto_ok["BRUTO"] / bruto["BRUTO"].sum()
-    return [bruto_ok, bruto]
+    bruto_ok["KONTRIBUSI"] = (bruto_ok["BRUTO"] / bruto["BRUTO"].sum()) * 100
+    return [bruto_ok, bruto_raw]
 
 
 @st.cache_data
@@ -442,9 +559,9 @@ def growth_month(filter, filter22):
     cy_kueri = f""" 
     SELECT
         p."BULANBAYAR" ,
-        sum(CASE WHEN p."KET" != 'SPMKP' AND p."TAHUNBAYAR" = EXTRACT(YEAR FROM CURRENT_DATE) THEN p."NOMINAL" END) AS "CY_BRUTO",
+        sum(CASE WHEN p."KET" in('MPN','SPM') AND p."TAHUNBAYAR" = EXTRACT(YEAR FROM CURRENT_DATE) THEN p."NOMINAL" END) AS "CY_BRUTO",
         sum(CASE WHEN p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE) THEN p."NOMINAL" END) AS "CY_NETTO" ,
-        abs(sum(CASE WHEN p."KET" = 'SPMKP' AND p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE) THEN p."NOMINAL" END)) AS "CY_RESTITUSI"
+        abs(sum(CASE WHEN p."KET" in('MPN','SPM') AND p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE) THEN p."NOMINAL" END)) AS "CY_RESTITUSI"
     FROM
         ppmpkm p
     WHERE {filter} 
@@ -454,9 +571,9 @@ def growth_month(filter, filter22):
     py_kueri = f""" 
          SELECT
         p."BULANBAYAR" ,
-        sum(CASE WHEN p."KET" != 'SPMKP' AND p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE)-1 THEN p."NOMINAL" END) AS "PY_BRUTO",
+        sum(CASE WHEN p."KET" in('MPN','SPM') AND p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE)-1 THEN p."NOMINAL" END) AS "PY_BRUTO",
         sum(CASE WHEN p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE)-1 THEN p."NOMINAL" END) AS "PY_NETTO" ,
-        abs(sum(CASE WHEN p."KET" = 'SPMKP' AND p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE)-1 THEN p."NOMINAL" END)) AS "PY_RESTITUSI"
+        abs(sum(CASE WHEN p."KET" in('MPN','SPM') AND p."TAHUNBAYAR" =  EXTRACT(YEAR FROM CURRENT_DATE)-1 THEN p."NOMINAL" END)) AS "PY_RESTITUSI"
     FROM
         ppmpkm p
     WHERE {filter22} 
@@ -597,7 +714,9 @@ def cluster(filter, filter22, kpp):
     """
     realisasi = conn.query(kueri)
     realisasi = (
-        realisasi.pivot_table(index="ADMIN", columns="TAHUNBAYAR", values="netto")
+        realisasi.pivot_table(
+            index="ADMIN", columns="TAHUNBAYAR", values="netto", aggfunc="sum"
+        )
         .reset_index()
         .rename(columns={2023: "REALISASI2023", 2022: "REALISASI2022"})
     )
@@ -615,5 +734,40 @@ def cluster(filter, filter22, kpp):
     return capaian
 
 
+def subsektor(filter, filter22):
+    kueri = f"""
+    SELECT 
+    p."NM_KATEGORI" , p."NM_GOLPOK",p."NAMA_KLU" ,p."TAHUNBAYAR" ,
+    sum(p."NOMINAL") "BRUTO"
+    FROM 
+    ppmpkm p 
+    WHERE p."KET"  in('MPN','SPM')  AND  {filter}
+    GROUP BY p."NM_KATEGORI" , p."NM_GOLPOK",p."NAMA_KLU", p."TAHUNBAYAR" 
+    UNION ALL 
+    SELECT 
+    p."NM_KATEGORI" , p."NM_GOLPOK" ,p."NAMA_KLU", p."TAHUNBAYAR" ,
+    sum(p."NOMINAL") "BRUTO"
+    FROM 
+    ppmpkm p 
+    WHERE p."KET"  in('MPN','SPM') AND {filter22}
+    GROUP BY p."NM_KATEGORI" , p."NM_GOLPOK",p."NAMA_KLU", p."TAHUNBAYAR"   """
+    data = conn.query(kueri)
+    data.rename(columns={"NM_GOLPOK": "Sub Sektor"}, inplace=True)
+    data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
+    data = data.pivot_table(
+        index=["NM_KATEGORI", "Sub Sektor", "NAMA_KLU"],
+        columns="TAHUNBAYAR",
+        values="BRUTO",
+        aggfunc="sum",
+    ).reset_index()
+    # data["Naik/Turun"] = data["2023"] - data["2022"]
+    # data["Tumbuh"] = round((data["Naik/Turun"] / data["2022"]) * 100, 2)
+
+    return data
+
+
 if __name__ == "__main__":
-    sektor_yoy()
+    filter = """"DATEBAYAR">='2023-01-01' and"DATEBAYAR"<='2023-06-25' and"ADMIN" IN ('007') """
+    filter22 = """ "DATEBAYAR">='2022-01-01' and"DATEBAYAR"<='2022-06-25' and"ADMIN" IN ('007') """
+    *_, sektor_yo = sektor_yoy(filter, filter22, includewp=False)
+    print(sektor_yo)
