@@ -434,145 +434,145 @@ elif st.session_state["authentication_status"]:
             st.metric("SPMKP", "0.0M")
 
     # PERSEKTOR-------------------------------------------------------------------------------
-    try:
-        data_sektor_awal = sektor_yoy(filter, filter22, includewp=False)
-        data_sektor = data_sektor_awal[0]
+    # try:
+    data_sektor_awal = sektor_yoy(filter, filter22, includewp=False)
+    data_sektor = data_sektor_awal[0]
 
-        sektor23 = go.Bar(
-            x=data_sektor["2023"] / 1000000000,
-            y=data_sektor["NM_KATEGORI"],
-            customdata=["text23"],
-            name="2023",
-            orientation="h",
-            text=data_sektor["kontrib2023"],
-            texttemplate="%{x:,.2f}M <br> (%{text})",
-            textposition="auto",
-            marker=dict(color="#005FAC"),
-            textangle=0,
-            base=0,
-        )
+    sektor23 = go.Bar(
+        x=data_sektor["2023"] / 1000000000,
+        y=data_sektor["NM_KATEGORI"],
+        customdata=["text23"],
+        name="2023",
+        orientation="h",
+        text=data_sektor["kontrib2023"],
+        texttemplate="%{x:,.2f}M <br> (%{text})",
+        textposition="auto",
+        marker=dict(color="#005FAC"),
+        textangle=0,
+        base=0,
+    )
 
-        sektor22 = go.Bar(
-            x=data_sektor["2022"] / 1000000000,
-            y=data_sektor["NM_KATEGORI"],
-            name="2022",
-            orientation="h",
-            text=data_sektor["kontrib2022"],
-            textposition="auto",
-            texttemplate="%{x:,.2f}M<br> (%{text})",
-            marker=dict(color="#ffc91b"),
-            textangle=0,
-            base=0,
-        )
-        sektor_data = [sektor22, sektor23]
-        sektor_layout = go.Layout(
-            barmode="group",
-            height=860,
-            bargap=0.1,
-            xaxis=dict(visible=False),
-            title=dict(
-                text="Per Sektor (Bruto)",
-                font=dict(color="slategrey", size=26),
-                x=0.5,
-                y=0.95,
-            ),
-            showlegend=True,
-            font=dict(
-                family="Arial",
-                size=14,
-                color="slategrey",
-            ),
-            legend=dict(font=dict(color="slategray")),
-            paper_bgcolor="rgba(0, 0, 0, 0)",
-            plot_bgcolor="rgba(0, 0, 0, 0)",
-        )
-        sektor_chart = go.Figure(data=sektor_data, layout=sektor_layout)
+    sektor22 = go.Bar(
+        x=data_sektor["2022"] / 1000000000,
+        y=data_sektor["NM_KATEGORI"],
+        name="2022",
+        orientation="h",
+        text=data_sektor["kontrib2022"],
+        textposition="auto",
+        texttemplate="%{x:,.2f}M<br> (%{text})",
+        marker=dict(color="#ffc91b"),
+        textangle=0,
+        base=0,
+    )
+    sektor_data = [sektor22, sektor23]
+    sektor_layout = go.Layout(
+        barmode="group",
+        height=860,
+        bargap=0.1,
+        xaxis=dict(visible=False),
+        title=dict(
+            text="Per Sektor (Bruto)",
+            font=dict(color="slategrey", size=26),
+            x=0.5,
+            y=0.95,
+        ),
+        showlegend=True,
+        font=dict(
+            family="Arial",
+            size=14,
+            color="slategrey",
+        ),
+        legend=dict(font=dict(color="slategray")),
+        paper_bgcolor="rgba(0, 0, 0, 0)",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
+    )
+    sektor_chart = go.Figure(data=sektor_data, layout=sektor_layout)
 
-        # sektor_bar.update_xaxes(visible=False)
+    # sektor_bar.update_xaxes(visible=False)
 
-        # kontribusi_bar = go.Bar(
-        #     x=data_sektor["kontribusi"],
-        #     y=data_sektor["NM_KATEGORI"],
-        #     name="kontribusi",
-        #     orientation="h",
-        #     text=data_sektor["kontrib_persen"],
-        #     textposition="auto",
-        #     marker=dict(color="#499894"),
-        #     textangle=0,
-        #     base=0,
-        #     showlegend=False,
-        # )
-        # kontrib_layout = go.Layout()
-        # kontribusi_chart = go.Figure(data=kontribusi_bar, layout=kontrib_layout)
+    # kontribusi_bar = go.Bar(
+    #     x=data_sektor["kontribusi"],
+    #     y=data_sektor["NM_KATEGORI"],
+    #     name="kontribusi",
+    #     orientation="h",
+    #     text=data_sektor["kontrib_persen"],
+    #     textposition="auto",
+    #     marker=dict(color="#499894"),
+    #     textangle=0,
+    #     base=0,
+    #     showlegend=False,
+    # )
+    # kontrib_layout = go.Layout()
+    # kontribusi_chart = go.Figure(data=kontribusi_bar, layout=kontrib_layout)
 
-        # kontribusi_chart.update_xaxes(visible=False)
-        sektor_chart.update_xaxes(showticklabels=True)  # autorange="reversed"
-        sektor_chart.update_yaxes(
-            showticklabels=True, griddash="dot", gridcolor="slategrey"
-        )  # autorange="reversed"
-        with chart_container(data_sektor):
-            st.plotly_chart(sektor_chart, use_container_width=True)
-        # data
-        data_sektor_table = sektor_yoy(filter, filter22, includewp=True)[2]
-        data_sektor_table = data_sektor_table[
-            [
-                "NAMA_WP",
-                "NM_KATEGORI",
-                "JENIS_WP",
-                "2022",
-                "kontribusi_2022",
-                "2023",
-                "kontribusi_2023",
-                "selisih",
-                "tumbuh",
-            ]
+    # kontribusi_chart.update_xaxes(visible=False)
+    sektor_chart.update_xaxes(showticklabels=True)  # autorange="reversed"
+    sektor_chart.update_yaxes(
+        showticklabels=True, griddash="dot", gridcolor="slategrey"
+    )  # autorange="reversed"
+    with chart_container(data_sektor):
+        st.plotly_chart(sektor_chart, use_container_width=True)
+    # data
+    data_sektor_table = sektor_yoy(filter, filter22, includewp=True)[2]
+    data_sektor_table = data_sektor_table[
+        [
+            "NAMA_WP",
+            "NM_KATEGORI",
+            "JENIS_WP",
+            "2022",
+            "kontribusi_2022",
+            "2023",
+            "kontribusi_2023",
+            "selisih",
+            "tumbuh",
         ]
+    ]
 
-        with chart_container(data_sektor_table):
-            st.dataframe(
-                filter_dataframe(data_sektor_table, key=1), use_container_width=True
-            )
-
-        klu_data = klu(filter)
-        klu = klu_data.copy()
-        klu["BRUTO_M"] = klu["BRUTO"] / 1000000000
-        klu["Kontribusi"] = ((klu["BRUTO"] / klu["BRUTO"].sum()) * 100).apply(
-            lambda x: "{:,.2f}%".format(x)
-        )
-        kluchart = px.treemap(
-            klu,
-            labels="NAMA_KLU",
-            values="BRUTO_M",
-            path=["NAMA_KLU"],
-            color="NM_KATEGORI",
-            color_discrete_sequence=px.colors.qualitative.Safe,
-            height=560,
-            custom_data=["Kontribusi"],
-            title="Proporsi Penerimaan per KLU",
-        )
-        kluchart.update_traces(
-            hovertemplate="<b>%{label}</b>(%{customdata[0]})<br><br>"
-            + "NAMA KLU: %{id}<br>"
-            + "BRUTO: %{value:,.1f}M <extra></extra>"
+    with chart_container(data_sektor_table):
+        st.dataframe(
+            filter_dataframe(data_sektor_table, key=1), use_container_width=True
         )
 
-        kluchart.update_layout(
-            paper_bgcolor="rgba(0, 0, 0, 0)",
-            plot_bgcolor="rgba(0, 0, 0, 0)",
-            xaxis_title="",
-            yaxis_title="",
-            title=dict(
-                text="Proporsi Klasifikasi Lapangan Usaha (Bruto)",
-                font=dict(color="slategrey", size=26),
-                x=0.5,
-                y=0.95,
-            ),
-        )
-        with chart_container(klu_data.sort_values(by="BRUTO", ascending=False)):
-            st.plotly_chart(kluchart, use_container_width=True)
+    klu_data = klu(filter)
+    klu = klu_data.copy()
+    klu["BRUTO_M"] = klu["BRUTO"] / 1000000000
+    klu["Kontribusi"] = ((klu["BRUTO"] / klu["BRUTO"].sum()) * 100).apply(
+        lambda x: "{:,.2f}%".format(x)
+    )
+    kluchart = px.treemap(
+        klu,
+        labels="NAMA_KLU",
+        values="BRUTO_M",
+        path=["NAMA_KLU"],
+        color="NM_KATEGORI",
+        color_discrete_sequence=px.colors.qualitative.Safe,
+        height=560,
+        custom_data=["Kontribusi"],
+        title="Proporsi Penerimaan per KLU",
+    )
+    kluchart.update_traces(
+        hovertemplate="<b>%{label}</b>(%{customdata[0]})<br><br>"
+        + "NAMA KLU: %{id}<br>"
+        + "BRUTO: %{value:,.1f}M <extra></extra>"
+    )
 
-    except:
-        st.subheader("🪂 No Data Available🪂")
+    kluchart.update_layout(
+        paper_bgcolor="rgba(0, 0, 0, 0)",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
+        xaxis_title="",
+        yaxis_title="",
+        title=dict(
+            text="Proporsi Klasifikasi Lapangan Usaha (Bruto)",
+            font=dict(color="slategrey", size=26),
+            x=0.5,
+            y=0.95,
+        ),
+    )
+    with chart_container(klu_data.sort_values(by="BRUTO", ascending=False)):
+        st.plotly_chart(kluchart, use_container_width=True)
+
+    # except:
+    #     st.subheader("🪂 No Data Available🪂")
 
     st.markdown(
         """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
