@@ -151,113 +151,122 @@ def sektor_yoy(filter, filter22, includewp: bool):
     if includewp:
         kueri = f"""
         SELECT p."NAMA_WP",
-        p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP", sum(p."NOMINAL") AS "NOMINAL"
+        p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP",
+        sum(p."NOMINAL") AS "NETTO",
+        sum(case when p."KET" in('MPN','SPM') then p."NOMINAL" end) as "BRUTO"
         FROM 
         ppmpkm p 
-        WHERE p."KET" in('MPN','SPM') and {filter}
+        WHERE {filter}
         GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
         UNION ALL 
         SELECT p."NAMA_WP",
-        p."NM_KATEGORI" , p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP", sum(p."NOMINAL") AS "NOMINAL"
+        p."NM_KATEGORI" , p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP",
+        sum(p."NOMINAL") AS "NETTO",
+        sum(case when p."KET" in('MPN','SPM') then p."NOMINAL" end) as "BRUTO"
         FROM 
         ppmpkm p 
-        WHERE p."KET" in('MPN','SPM') and {filter22}
+        WHERE {filter22}
         GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
         """
         data = conn.query(kueri)
-        # if data["NOMINAL"].sum() > 0:
         data["NM_KATEGORI"] = data["NM_KATEGORI"].map(dict_sektor)
         data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
 
         sektor_yoy = data.pivot_table(
-            index=["NAMA_WP", "NM_KATEGORI", "JENIS_WP"],
+            index=["NM_KATEGORI"],
             columns="TAHUNBAYAR",
-            values="NOMINAL",
+            values=["NETTO", "BRUTO"],
             aggfunc="sum",
         ).reset_index()
 
-        sektor_yoy["selisih"] = round(sektor_yoy["2023"] - sektor_yoy["2022"], 0)
-        sektor_yoy["tumbuh"] = (sektor_yoy["selisih"] / sektor_yoy["2022"]) * 100
+        sektor_yoy = sektor_yoy.sort_values(by=("BRUTO", "2023"), ascending=False)
+        sektor_yoy["NaikBruto"] = round(
+            sektor_yoy[("BRUTO", "2023")] - sektor_yoy[("BRUTO", "2022")], 0
+        )
+        sektor_yoy["NaikNetto"] = round(
+            sektor_yoy[("NETTO", "2023")] - sektor_yoy[("NETTO", "2022")], 0
+        )
+        sektor_yoy["TumbuhBruto"] = (
+            sektor_yoy["NaikBruto"] / sektor_yoy[("BRUTO", "2022")]
+        ) * 100
+        sektor_yoy.columns = sektor_yoy.columns.map("".join)
 
-        # sektor_mom = data[data["TAHUNBAYAR"] == 2023]
         sektor_mom = data.pivot_table(
             index=["NM_KATEGORI", "BULANBAYAR"],
             columns="TAHUNBAYAR",
-            values="NOMINAL",
+            values=["BRUTO", "NETTO"],
             aggfunc="sum",
         ).reset_index()
+        sektor_mom.columns = sektor_mom.columns.map("".join)
     else:
         kueri = f"""
-        SELECT 
-        p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR", sum(p."NOMINAL") AS "NOMINAL"
+        SELECT p."NAMA_WP",
+        p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP",
+        sum(p."NOMINAL") AS "NETTO",
+        sum(case when p."KET" in('MPN','SPM') then p."NOMINAL" end) as "BRUTO"
         FROM 
         ppmpkm p 
-        WHERE p."KET" in('MPN','SPM') and {filter}
-        GROUP BY p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR"
+        WHERE {filter}
+        GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
         UNION ALL 
-        SELECT 
-        p."NM_KATEGORI" , p."TAHUNBAYAR",p."BULANBAYAR", sum(p."NOMINAL") AS "NOMINAL"
+        SELECT p."NAMA_WP",
+        p."NM_KATEGORI" , p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP",
+        sum(p."NOMINAL") AS "NETTO",
+        sum(case when p."KET" in('MPN','SPM') then p."NOMINAL" end) as "BRUTO"
         FROM 
         ppmpkm p 
-        WHERE p."KET" in('MPN','SPM') and {filter22}
-        GROUP BY p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR"
+        WHERE {filter22}
+        GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
         """
         data = conn.query(kueri)
-        # if data["NOMINAL"].sum() > 0:
         data["NM_KATEGORI"] = data["NM_KATEGORI"].map(dict_sektor)
         data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
 
         sektor_yoy = data.pivot_table(
-            index=["NM_KATEGORI"], columns="TAHUNBAYAR", values="NOMINAL", aggfunc="sum"
+            index=["NM_KATEGORI"],
+            columns="TAHUNBAYAR",
+            values=["NETTO", "BRUTO"],
+            aggfunc="sum",
         ).reset_index()
 
-        sektor_yoy = sektor_yoy.sort_values(by="2023", ascending=False)
-        sektor_yoy["selisih"] = round(sektor_yoy["2023"] - sektor_yoy["2022"], 0)
-        sektor_yoy["tumbuh"] = (sektor_yoy["selisih"] / sektor_yoy["2022"]) * 100
+        sektor_yoy = sektor_yoy.sort_values(by=("BRUTO", "2023"), ascending=False)
+        sektor_yoy["NaikBruto"] = round(
+            sektor_yoy[("BRUTO", "2023")] - sektor_yoy[("BRUTO", "2022")], 0
+        )
+        sektor_yoy["NaikNetto"] = round(
+            sektor_yoy[("NETTO", "2023")] - sektor_yoy[("NETTO", "2022")], 0
+        )
+        sektor_yoy["TumbuhBruto"] = (
+            sektor_yoy["NaikBruto"] / sektor_yoy[("BRUTO", "2022")]
+        ) * 100
+        sektor_yoy.columns = sektor_yoy.columns.map("".join)
 
         sektor_mom = data.pivot_table(
             index=["NM_KATEGORI", "BULANBAYAR"],
             columns="TAHUNBAYAR",
-            values="NOMINAL",
+            values=["BRUTO", "NETTO"],
             aggfunc="sum",
         ).reset_index()
-    sektor_yoy9 = sektor_yoy.nlargest(10, "2023")
-    sektor_yoy9 = sektor_yoy9.assign(
-        text22=sektor_yoy9["2022"].apply(lambda x: format_angka(x)),
-        text23=sektor_yoy9["2023"].apply(lambda x: format_angka(x)),
-        kontribusi_2023=(sektor_yoy9["2023"] / sektor_yoy["2023"].sum()) * 100,
-        kontribusi_2022=(sektor_yoy9["2022"] / sektor_yoy["2022"].sum()) * 100,
-    )
-    sektor_yoy9 = sektor_yoy9.assign(
-        kontrib2023=sektor_yoy9["kontribusi_2023"].apply(lambda x: "{:,.1f}%".format(x))
-    ).assign(
-        kontrib2022=sektor_yoy9["kontribusi_2022"].apply(lambda x: "{:,.1f}%".format(x))
-    )
-
-    sektor_yoy9.sort_values(by="2023", ascending=True, inplace=True)
-    sektor_yoy9["tumbuh"] = sektor_yoy9["tumbuh"].apply(lambda x: "{:,.1f}%".format(x))
+        sektor_mom.columns = sektor_mom.columns.map("".join)
 
     # sektor yoy[2]
-    sektor_yoy = sektor_yoy.assign(
-        kontribusi_2023=round((sektor_yoy["2023"] / sektor_yoy["2023"].sum()) * 100, 2),
-        kontribusi_2022=round((sektor_yoy["2022"] / sektor_yoy["2022"].sum()) * 100, 2),
+    sektor_yoy9 = sektor_yoy.nlargest(10, "NETTO2023")
+    sektor_yoy9 = sektor_yoy9.assign(
+        text22=sektor_yoy9["BRUTO2022"].apply(lambda x: format_angka(x)),
+        text23=sektor_yoy9["BRUTO2023"].apply(lambda x: format_angka(x)),
+        Kontribusi2023=(sektor_yoy9["BRUTO2023"] / sektor_yoy["BRUTO2023"].sum()) * 100,
+        Kontribusi2022=(sektor_yoy9["BRUTO2022"] / sektor_yoy["BRUTO2022"].sum()) * 100,
     )
-    sektor_yoy["2023"] = round(sektor_yoy["2023"], 0)
-    sektor_yoy["2022"] = round(sektor_yoy["2022"], 0)
-    # sektor_yoy = sektor_yoy.assign(
-    #     kontrib2023=sektor_yoy["kontribusi_2023"].apply(
-    #         lambda x: "{:,.1f}%".format(x * 100)
-    #     ),
-    #     kontrib2022=sektor_yoy["kontribusi_2022"].apply(
-    #         lambda x: "{:,.1f}%".format(x * 100)
-    #     ),
-    # )
-    sektor_yoy["tumbuh"] = round(sektor_yoy["tumbuh"].fillna(0), 2)
-    # sektor_yoy["tumbuh"] = sektor_yoy["tumbuh"].apply(
-    #     lambda x: "{:,.1f}%".format(x * 100)
-    # )
+    sektor_yoy9 = sektor_yoy9.assign(
+        kontrib2023=sektor_yoy9["Kontribusi2023"].apply(lambda x: "{:,.1f}%".format(x))
+    ).assign(
+        kontrib2022=sektor_yoy9["Kontribusi2022"].apply(lambda x: "{:,.1f}%".format(x))
+    )
 
-    sektor_yoy = sektor_yoy.sort_values(by="2023", ascending=False)
+    sektor_yoy9.sort_values(by="BRUTO2023", ascending=True, inplace=True)
+    sektor_yoy9["TumbuhBruto_f"] = sektor_yoy9["TumbuhBruto"].apply(
+        lambda x: "{:,.1f}%".format(x)
+    )
     return [sektor_yoy9, sektor_mom, sektor_yoy]
 
 
@@ -291,23 +300,27 @@ def klu(filter):
 def jns_pajak(filter, filter22, includewp: bool):
     kueri = f"""
     SELECT 
-    p."NAMA_WP",p."MAP" , p."TAHUNBAYAR",p."JENIS_WP",sum(p."NOMINAL") AS "BRUTO" 
+    p."NAMA_WP",p."MAP" , p."TAHUNBAYAR",p."JENIS_WP",
+    sum(p."NOMINAL") AS "NETTO" ,
+    sum(case when  p."KET" in('MPN','SPM') then p."NOMINAL" end) as "BRUTO"
     FROM 
     public.ppmpkm p 
-    WHERE {filter} and p."KET" in('MPN','SPM')
+    WHERE {filter} 
     GROUP BY p."NAMA_WP", p."MAP" ,p."TAHUNBAYAR",p."JENIS_WP"
     UNION ALL
     SELECT 
-    p."NAMA_WP",p."MAP" , p."TAHUNBAYAR",p."JENIS_WP", sum(p."NOMINAL") AS "BRUTO" 
+    p."NAMA_WP",p."MAP" , p."TAHUNBAYAR",p."JENIS_WP",
+    sum(p."NOMINAL") AS "NETTO" ,
+    sum(case when  p."KET" in('MPN','SPM') then p."NOMINAL" end) as "BRUTO"
     FROM 
     public.ppmpkm p 
-    WHERE {filter22} and p."KET" in('MPN','SPM')
+    WHERE {filter22} 
     GROUP BY p."NAMA_WP",p."MAP" ,p."TAHUNBAYAR" ,p."JENIS_WP"
     """
     jenis = conn.query(kueri)
     if includewp:
         jenis_wp = (
-            jenis.groupby(["NAMA_WP", "MAP", "TAHUNBAYAR", "JENIS_WP"])["BRUTO"]
+            jenis.groupby(["NAMA_WP", "MAP", "TAHUNBAYAR", "JENIS_WP"])
             .sum()
             .reset_index()
         )
@@ -316,73 +329,91 @@ def jns_pajak(filter, filter22, includewp: bool):
             jenis_wp,
             index=["NAMA_WP", "MAP", "JENIS_WP"],
             columns="TAHUNBAYAR",
-            values="BRUTO",
+            values=["NETTO", "BRUTO"],
             aggfunc="sum",
-        )
+        ).reset_index()
+        jenis_wp.columns = jenis_wp.columns.map("".join)
         jenis_wp = (
             jenis_wp.assign(
                 TUMBUH=round(
-                    ((jenis_wp["2023"] - jenis_wp["2022"]) / jenis_wp["2022"] * 100),
+                    (
+                        (jenis_wp["BRUTO2023"] - jenis_wp["BRUTO2022"])
+                        / jenis_wp["BRUTO2022"]
+                        * 100
+                    ),
                     2,
                 )
             )
             .assign(
                 KONTRIBUSI2023=round(
-                    (jenis_wp["2023"] / jenis_wp["2023"].sum() * 100), 2
+                    (jenis_wp["BRUTO2023"] / jenis_wp["BRUTO2023"].sum() * 100), 2
                 )
             )
             .assign(
                 KONTRIBUSI2022=round(
-                    (jenis_wp["2022"] / jenis_wp["2022"].sum() * 100), 2
+                    (jenis_wp["BRUTO2022"] / jenis_wp["BRUTO2022"].sum() * 100), 2
                 )
             )
-            .sort_values(by="2023", ascending=False)
+            .sort_values(by="BRUTO2023", ascending=False)
         )
-        jenis_wp9 = jenis_wp.nlargest(10, "2023")
+        jenis_wp.loc[:, "BRUTO2022":"NETTO2023"] = jenis_wp.loc[
+            :, "BRUTO2022":"NETTO2023"
+        ].applymap(lambda x: round(x, 0))
+        jenis_wp9 = jenis_wp.nlargest(10, "BRUTO2023")
 
         jenis_wp9 = jenis_wp9.assign(
-            tbruto=jenis_wp9["2023"].apply(lambda x: "{:,.1f}M".format(x / 1000000000))
+            text23=jenis_wp9["BRUTO2023"].apply(
+                lambda x: "{:,.1f}M".format(x / 1000000000)
+            )
         )
-        jenis_wp9 = jenis_wp9.sort_values(by="2023", ascending=True)
+        jenis_wp9 = jenis_wp9.sort_values(by="BRUTO2023", ascending=False)
         return [jenis_wp, jenis_wp9]
 
     else:
-        jenis_nwp = jenis.groupby(["MAP", "TAHUNBAYAR"])["BRUTO"].sum().reset_index()
+        jenis_nwp = jenis.groupby(["MAP", "TAHUNBAYAR"]).sum().reset_index()
         jenis_nwp["TAHUNBAYAR"] = jenis_nwp["TAHUNBAYAR"].astype("str")
         jenis_nwp = pd.pivot_table(
             jenis_nwp,
             index=["MAP"],
             columns="TAHUNBAYAR",
-            values="BRUTO",
+            values=["NETTO", "BRUTO"],
             aggfunc="sum",
-        )
-
+        ).reset_index()
+        jenis_nwp.columns = jenis_nwp.columns.map("".join)
         jenis_nwp = (
             jenis_nwp.assign(
                 TUMBUH=round(
-                    ((jenis_nwp["2023"] - jenis_nwp["2022"]) / jenis_nwp["2022"] * 100),
+                    (
+                        (jenis_nwp["BRUTO2023"] - jenis_nwp["BRUTO2022"])
+                        / jenis_nwp["BRUTO2022"]
+                        * 100
+                    ),
                     2,
                 )
             )
             .assign(
                 KONTRIBUSI2023=round(
-                    (jenis_nwp["2023"] / jenis_nwp["2023"].sum() * 100), 2
+                    (jenis_nwp["BRUTO2023"] / jenis_nwp["BRUTO2023"].sum() * 100), 2
                 )
             )
             .assign(
                 KONTRIBUSI2022=round(
-                    (jenis_nwp["2022"] / jenis_nwp["2022"].sum() * 100), 2
+                    (jenis_nwp["BRUTO2022"] / jenis_nwp["BRUTO2022"].sum() * 100), 2
                 )
             )
-            .sort_values(by="2023", ascending=False)
+            .sort_values(by="BRUTO2023", ascending=False)
         )
-
-        jenis_nwp9 = jenis_nwp.nlargest(10, "2023")
+        jenis_nwp.loc[:, "BRUTO2022":"NETTO2023"] = jenis_nwp.loc[
+            :, "BRUTO2022":"NETTO2023"
+        ].applymap(lambda x: round(x, 0))
+        jenis_nwp9 = jenis_nwp.nlargest(10, "BRUTO2023")
 
         jenis_nwp9 = jenis_nwp9.assign(
-            tbruto=jenis_nwp9["2023"].apply(lambda x: "{:,.1f}M".format(x / 1000000000))
+            text23=jenis_nwp9["BRUTO2023"].apply(
+                lambda x: "{:,.1f}M".format(x / 1000000000)
+            )
         )
-        jenis_nwp9 = jenis_nwp9.sort_values(by="2023", ascending=True)
+        jenis_nwp9 = jenis_nwp9.sort_values(by="BRUTO2023", ascending=False)
         return [jenis_nwp, jenis_nwp9]
 
 
@@ -507,11 +538,12 @@ def proporsi(filter):
     select 
     p."NPWP",
     p."NAMA_WP" , p."JENIS_WP",
-    sum(p."NOMINAL") as "BRUTO"
+    sum(p."NOMINAL") as "NETTO",
+    sum(case when p."KET" in('MPN','SPM') then p."NOMINAL" end) as "BRUTO"
     from ppmpkm p 
-    where p."KET" in('MPN','SPM') and {filter}
+    where {filter}
     group by p."NPWP" ,p."NAMA_WP"  , p."JENIS_WP"
-    order by "BRUTO" desc
+    order by "NETTO" desc
     """
     bruto_raw = conn.query(kueri)
     # bruto_nol = bruto[bruto['NPWP'].str.startswith('00000000')]
@@ -519,31 +551,50 @@ def proporsi(filter):
     # # rowplus = row-len(brutomin)
 
     bruto = bruto_raw.drop(columns="JENIS_WP")
-    bruto = bruto.groupby(["NPWP", "NAMA_WP"])["BRUTO"].sum().reset_index()
-    bruto_a = bruto.nlargest(10, columns="BRUTO")
+    bruto = (
+        bruto.groupby(["NPWP", "NAMA_WP"])
+        .sum()
+        .reset_index()
+        .sort_values(by="NETTO", ascending=False)
+    )
+    bruto_a = bruto.nlargest(10, columns="NETTO")
     bruto_b = pd.DataFrame(
-        [["Penerimaan 10 WP Terbesar", bruto_a["BRUTO"].sum()]],
-        columns=["NAMA_WP", "BRUTO"],
+        [["Penerimaan 10 WP Terbesar", bruto_a["NETTO"].sum(), bruto_a["BRUTO"].sum()]],
+        columns=["NAMA_WP", "NETTO", "BRUTO"],
     )
     bruto_c = pd.DataFrame(
-        [["Penerimaan 11 s.d. 100 WP Terbesar", bruto.iloc[10:100,]["BRUTO"].sum()]],
-        columns=["NAMA_WP", "BRUTO"],
+        [
+            [
+                "Penerimaan 11 s.d. 100 WP Terbesar",
+                bruto.iloc[10:100,]["NETTO"].sum(),
+                bruto.iloc[10:100,]["BRUTO"].sum(),
+            ]
+        ],
+        columns=["NAMA_WP", "NETTO", "BRUTO"],
     )
     bruto_d = pd.DataFrame(
-        [["Penerimaan 101 s.d. 500 WP Terbesar", bruto.iloc[100:500,]["BRUTO"].sum()]],
-        columns=["NAMA_WP", "BRUTO"],
+        [
+            [
+                "Penerimaan 101 s.d. 500 WP Terbesar",
+                bruto.iloc[100:500,]["NETTO"].sum(),
+                bruto.iloc[100:500,]["BRUTO"].sum(),
+            ]
+        ],
+        columns=["NAMA_WP", "NETTO", "BRUTO"],
     )
     bruto_e = pd.DataFrame(
         [
             [
                 "Penerimaan 501 s.d. {} WP Terbesar".format(row),
+                bruto.iloc[500:row,]["NETTO"].sum(),
                 bruto.iloc[500:row,]["BRUTO"].sum(),
             ]
         ],
-        columns=["NAMA_WP", "BRUTO"],
+        columns=["NAMA_WP", "NETTO", "BRUTO"],
     )
     bruto_g = pd.DataFrame(
-        [["Total", bruto["BRUTO"].sum()]], columns=["NAMA_WP", "BRUTO"]
+        [["Total", bruto["NETTO"].sum(), bruto["BRUTO"].sum()]],
+        columns=["NAMA_WP", "NETTO", "BRUTO"],
     )
     bruto_ok = pd.concat(
         [bruto_a, bruto_b, bruto_c, bruto_d, bruto_e, bruto_g],
@@ -551,7 +602,7 @@ def proporsi(filter):
         ignore_index=True,
     )
     bruto_ok["KONTRIBUSI"] = (bruto_ok["BRUTO"] / bruto["BRUTO"].sum()) * 100
-    return [bruto_ok, bruto_raw]
+    return [bruto_ok, bruto]
 
 
 @st.cache_data

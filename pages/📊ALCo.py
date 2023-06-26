@@ -89,9 +89,7 @@ else:
     with st.sidebar:
         add_logo("assets/unit.png", height=150)
         st.text(f"Salam Satu Bahu {st.session_state['name']}")
-        urutan = st.radio(
-            "Urut Berdasarkan:", options=["2023", "2022", "tumbuh"], horizontal=True
-        )
+
         mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
         start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
         end = st.date_input("Tgl Akhir", max_value=date.today())
@@ -125,23 +123,27 @@ else:
         border_color="rgba(0,0,0,0)",
         border_left_color="rgba(0,0,0,0)",
     )
-
+    urutan = st.selectbox(
+        "Urut Berdasarkan:",
+        options=["BRUTO2023", "BRUTO2022", "NETTO2023", "NETTO2022", "TumbuhBruto"],
+    )
     # SEKTORRRR CARD
     sektor = sektor_yoy(filter, filter22, includewp=False)
     *_, sektor_mom, sektor_yoy = sektor
 
-    # st.dataframe(sektor)
-    sektor_yoy["%kontribusi"] = (sektor_yoy["2023"] / sektor_yoy["2023"].sum()) * 100
+    sektor_yoy["%kontribusi"] = (
+        sektor_yoy["BRUTO2023"] / sektor_yoy["BRUTO2023"].sum()
+    ) * 100
 
-    sektor_yoy1 = sektor_yoy[sektor_yoy["NM_KATEGORI"] != "KLU ERROR"]
-    sektor_yoy["rank"] = sektor_yoy[f"{urutan}"].rank(ascending=False)
+    sektor_yoy1 = sektor_yoy[~sektor_yoy["NM_KATEGORI"].isin(["KLU ERROR", " "])]
+    sektor_yoy["Rank"] = sektor_yoy[f"{urutan}"].rank(ascending=False)
 
-    sektor_plus = sektor_yoy1[sektor_yoy1["selisih"] > 0]
-    sektor_plus["rank"] = sektor_plus[f"{urutan}"].rank(ascending=False)
-    sektor_plus.set_index("rank", inplace=True)
-    sektor_min = sektor_yoy1[sektor_yoy1["selisih"] < 0]
-    sektor_min["rank"] = sektor_min[f"{urutan}"].rank(ascending=False)
-    sektor_min.set_index("rank", inplace=True)
+    sektor_plus = sektor_yoy1[sektor_yoy1["NaikBruto"] > 0]
+    sektor_plus["Rank"] = sektor_plus[f"{urutan}"].rank(ascending=False)
+    sektor_plus.set_index("Rank", inplace=True)
+    sektor_min = sektor_yoy1[sektor_yoy1["NaikBruto"] < 0]
+    sektor_min["Rank"] = sektor_min[f"{urutan}"].rank(ascending=False)
+    sektor_min.set_index("Rank", inplace=True)
 
     # CONTAINER SEKTOR SURPLUS
     rows = ceil(len(sektor_plus) / 4)
@@ -174,15 +176,14 @@ else:
                         sektor_mom_select = (
                             sektor_mom_select.groupby("BULANBAYAR").sum().reset_index()
                         )
-                        sektor_mom_select = sektor_mom_select.melt(
-                            id_vars="BULANBAYAR", value_name="NOMINAL"
-                        )
+                        # sektor_mom_select = sektor_mom_select.melt(
+                        #     id_vars="BULANBAYAR", value_name="NOMINAL", var_name="JENIS"
+                        # )
                         # st.dataframe(sektor_mom_select)
                         spark = px.line(
                             sektor_mom_select,
                             x="BULANBAYAR",
-                            y="NOMINAL",
-                            color="TAHUNBAYAR",
+                            y=["BRUTO2023", "BRUTO2022"],
                             markers=True,
                             height=100,
                             width=200,
@@ -193,8 +194,8 @@ else:
                             template=None,
                             xaxis_title="",
                             yaxis_title="",
-                            yaxis={"visible": False},
-                            xaxis={"visible": False},
+                            yaxis={"visible": False, "showticklabels": False},
+                            xaxis={"visible": False, "showticklabels": False},
                             margin=dict(l=0, r=0, t=0, b=0),
                             paper_bgcolor="rgba(0, 0, 0, 0)",
                             plot_bgcolor="rgba(0, 0, 0, 0)",
@@ -204,8 +205,10 @@ else:
                         st.plotly_chart(spark, use_container_width=True)
                         st.metric(
                             data_col.loc[counter, "NM_KATEGORI"],
-                            value=format_number(data_col.loc[counter, "2023"]),
-                            delta="{:,.2f}%".format(data_col.loc[counter, "tumbuh"]),
+                            value=format_number(data_col.loc[counter, "BRUTO2023"]),
+                            delta="{:,.2f}%".format(
+                                data_col.loc[counter, "TumbuhBruto"]
+                            ),
                         )
 
                     counter += 1
@@ -243,15 +246,14 @@ else:
                         sektor_mom_select = (
                             sektor_mom_select.groupby("BULANBAYAR").sum().reset_index()
                         )
-                        sektor_mom_select = sektor_mom_select.melt(
-                            id_vars="BULANBAYAR", value_name="NOMINAL"
-                        )
+                        # sektor_mom_select = sektor_mom_select.melt(
+                        #     id_vars="BULANBAYAR", value_name="NOMINAL"
+                        # )
 
                         spark = px.line(
                             sektor_mom_select,
                             x="BULANBAYAR",
-                            y="NOMINAL",
-                            color="TAHUNBAYAR",
+                            y=["BRUTO2023", "BRUTO2022"],
                             markers=True,
                             height=100,
                             width=200,
@@ -271,18 +273,20 @@ else:
                         st.plotly_chart(spark, use_container_width=True)
                         st.metric(
                             data_col.loc[counter, "NM_KATEGORI"],
-                            value=format_number(data_col.loc[counter, "2023"]),
-                            delta="{:,.2f}%".format(data_col.loc[counter, "tumbuh"]),
+                            value=format_number(data_col.loc[counter, "BRUTO2023"]),
+                            delta="{:,.2f}%".format(
+                                data_col.loc[counter, "TumbuhBruto"]
+                            ),
                         )
                     counter += 1
 
     with st.expander("Detail Data"):
-        sektor_yoy.sort_values(by="rank", ascending=True, inplace=True)
+        sektor_yoy.sort_values(by="Rank", ascending=True, inplace=True)
         with chart_container(sektor_yoy):
             st.dataframe(sektor_yoy)
 
     # SUBSEKTOR---------------------------------------------------------------------------
-    st.subheader("🚧 SubSektor(under construction)🚧")
+    st.subheader("🔭SubSektor🩺")
     data_subsektor = subsektor(filter, filter22)
     with chart_container(data_subsektor):
         nama_sektor = data_subsektor["NM_KATEGORI"].unique().tolist()

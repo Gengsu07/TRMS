@@ -439,7 +439,7 @@ elif st.session_state["authentication_status"]:
     data_sektor = data_sektor_awal[0]
 
     sektor23 = go.Bar(
-        x=data_sektor["2023"] / 1000000000,
+        x=data_sektor["BRUTO2023"] / 1000000000,
         y=data_sektor["NM_KATEGORI"],
         customdata=["text23"],
         name="2023",
@@ -453,7 +453,7 @@ elif st.session_state["authentication_status"]:
     )
 
     sektor22 = go.Bar(
-        x=data_sektor["2022"] / 1000000000,
+        x=data_sektor["BRUTO2022"] / 1000000000,
         y=data_sektor["NM_KATEGORI"],
         name="2022",
         orientation="h",
@@ -516,15 +516,14 @@ elif st.session_state["authentication_status"]:
     data_sektor_table = sektor_yoy(filter, filter22, includewp=True)[2]
     data_sektor_table = data_sektor_table[
         [
-            "NAMA_WP",
             "NM_KATEGORI",
-            "JENIS_WP",
-            "2022",
-            "kontribusi_2022",
-            "2023",
-            "kontribusi_2023",
-            "selisih",
-            "tumbuh",
+            "BRUTO2022",
+            "BRUTO2023",
+            "NETTO2022",
+            "NETTO2023",
+            "NaikBruto",
+            "NaikNetto",
+            "TumbuhBruto",
         ]
     ]
 
@@ -579,15 +578,14 @@ elif st.session_state["authentication_status"]:
         unsafe_allow_html=True,
     )
     # JENIS PAJAK----------------------------------------------------------------------------------------
+    jenis_pajak, jenis_pajak9 = jns_pajak(filter, filter22, includewp=False)
     try:
         jenis_pajak, jenis_pajak9 = jns_pajak(filter, filter22, includewp=False)
 
-        # jenis_pajak9_23 = jenis_pajak9[jenis_pajak9["TAHUNBAYAR"] == "2023"].sort_values(
-        #     by="BRUTO", ascending=True
-        # )
+        jenis_pajak9 = jenis_pajak9.sort_values(by="BRUTO2023", ascending=True)
         mapbar23 = go.Bar(
-            x=jenis_pajak9["2023"] / 1000000000,
-            y=jenis_pajak9.index,
+            x=jenis_pajak9["BRUTO2023"] / 1000000000,
+            y=jenis_pajak9["MAP"],
             name="2023",
             orientation="h",
             text=jenis_pajak9["KONTRIBUSI2023"],
@@ -598,8 +596,8 @@ elif st.session_state["authentication_status"]:
         )
 
         mapbar22 = go.Bar(
-            x=jenis_pajak9["2022"] / 1000000000,
-            y=jenis_pajak9.index,
+            x=jenis_pajak9["BRUTO2022"] / 1000000000,
+            y=jenis_pajak9["MAP"],
             name="2022",
             orientation="h",
             text=jenis_pajak9["KONTRIBUSI2022"],
