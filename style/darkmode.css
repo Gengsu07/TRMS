@@ -12,6 +12,9 @@
 /* [data-testid="stSidebar"] {
     background-color: #eef0eb;
   } */
+.css-nprvyh {
+  display: contents;
+}
 
 [data-testid="stAppViewContainer"] {
   background-color: #282a36;

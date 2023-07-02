@@ -5,6 +5,9 @@
 /* [data-testid="stAppViewContainer"] {
   background-color: #f4f7f5;
 } */
+.css-nprvyh {
+  display: contents;
+}
 
 div.css-zt5igj.eqr7zpz3 {
   align-items: center;
@@ -114,7 +117,21 @@ footer {
 .css-nqowgj {
   color: white;
 }
+
+/* login button*/
+.css-1n543e5 {
+  background-color: #005fac;
+}
+.css-fblp2m {
+  background-color: #2c5a7b;
+}
 .css-81oif8 {
+  /* background-color: #005fac; */
+  color: black;
+  padding-left: 1rem;
+}
+.css-81oif8.e1oyb3mv3 {
+  background-color: #005fac;
   color: white;
 }
 [data-testid="stText"] {
@@ -124,7 +141,7 @@ div.st-di {
   color: white;
 }
 div.stCheckbox {
-  background-color: #2c5a7b;
+  background-color: #005fac;
 }
 
 .css-1vbkxwb {

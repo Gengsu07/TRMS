@@ -20,6 +20,7 @@ st.set_page_config(
     page_title="Tax Revenue Monitoring Sistem",
     page_icon="assets\logo_djo.png",
     layout="wide",
+    initial_sidebar_state="collapsed",
 )
 from scripts.login import names, usernames
 from scripts.db import (
@@ -35,6 +36,9 @@ from scripts.db import (
     naikturun,
     proporsi,
     cluster,
+    data_sankey,
+    generate_rgba_colors,
+    top10kpp,
 )
 from scripts.filter_dataframe import filter_dataframe
 
@@ -51,6 +55,17 @@ conn = st.experimental_connection("ppmpkm", type="sql")
 def unique_key(seed: int):
     random.seed(seed)
     return random.choice(list(range(1, 1000)))
+
+
+def n_color():
+    # opacity_sankey = st.select_slider(
+    #     "kecerahan",
+    #     options=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
+    #     value=0.5,
+    # )
+    n_color = generate_rgba_colors(len(data_sankey), 0.5)
+    n_color = n_color["rgba"]
+    return n_color
 
 
 @st.cache_resource
@@ -159,21 +174,42 @@ elif st.session_state["authentication_status"]:
         else:
             st.session_state["darkmode"] = "off"
         add_logo("assets/unit.png", height=150)
+
+    # Main apps-----------------------------------------------------------------------
+    colmain = st.columns([1, 4, 1])
+    with colmain[0]:
+        st.image("assets/unit.png", width=150)
+    with colmain[1]:
+        st.header("Tax Revenue Monitoring Sistem🚀")
+    with colmain[2]:
+        st.image("assets/unit.png", width=150)
+    # st.markdown(
+    #     """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
+    #     unsafe_allow_html=True,
+    # )
+    col_filter = st.columns([1, 1, 1, 2, 2, 2, 2])
+    with col_filter[0]:
         mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
         start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
+    with col_filter[1]:
         end = st.date_input("Tgl Akhir", max_value=date.today())
+    with col_filter[2]:
         kpp = conn.query('select distinct "ADMIN" from ppmpkm where "ADMIN" notnull')
         kpp = st.multiselect("KPP", options=kpp.iloc[:, 0].tolist())
+    with col_filter[3]:
         map = conn.query('select distinct "MAP" from ppmpkm where "MAP" notnull')
         map = st.multiselect("MAP", options=map.iloc[:, 0].tolist())
+    with col_filter[4]:
         sektor = conn.query(
             'select distinct "NM_KATEGORI" from ppmpkm where "NM_KATEGORI" notnull'
         )
         sektor = st.multiselect("SEKTOR", options=sektor.iloc[:, 0].tolist())
+    with col_filter[5]:
         segmen = conn.query(
             """select distinct "SEGMENTASI_WP" from ppmpkm where "SEGMENTASI_WP" notnull and "SEGMENTASI_WP"!='' """
         )
         segmen = st.multiselect("SEGMENTASI", options=segmen.iloc[:, 0].tolist())
+    with col_filter[6]:
         # wp
         wp = conn.query(
             """select distinct "NAMA_WP" from ppmpkm where "NAMA_WP" notnull and "NAMA_WP"!=''
@@ -181,14 +217,12 @@ elif st.session_state["authentication_status"]:
         )
         wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
 
-    # Main apps-----------------------------------------------------------------------
-    st.subheader("🚀Tax Revenue Monitoring Sistem")
-
     # filterdata
     filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
     filter = "and".join(x for x in filter_gabungan[0])
     filter_date = "and".join(x for x in filter_gabungan[0][:2])
     filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
+    filter_cat = "and".join(x for x in filter_gabungan[1][2:])
     filter22 = "and".join(x for x in filter_gabungan[1])
 
     # KPI-----------------------------------------------------------------------------------
@@ -264,6 +298,57 @@ elif st.session_state["authentication_status"]:
             "{:.2f}%".format(persentase23 * 100),
             delta="{:.2f}%".format(tumbuh_persen * 100),
         )
+    # KET-----------------------------------------------------------------------
+    ket = data_ket(filter, filter22).set_index("KET")
+
+    colket = st.columns(5)
+    with colket[0]:
+        if "MPN" in ket.index:
+            # format_number = "{:,.1f}M" if ket.loc["MPN", "2023"] >= 0 else "{:,.1f}M"
+            # format_number_T = "{:,.1f}T" if ket.loc["MPN", "2023"] >= 0 else "{:,.1f}T"
+            st.metric(
+                "MPN",
+                format_angka(ket.loc["MPN", "2023"]),
+                delta=format_angka(ket.loc["MPN", "selisih"]),
+            )
+        else:
+            st.metric("MPN", "0M")
+    with colket[1]:
+        if "SPM" in ket.index:
+            st.metric(
+                "SPM",
+                format_angka(ket.loc["SPM", "2023"]),
+                delta=format_angka(ket.loc["SPM", "selisih"]),
+            )
+        else:
+            st.metric("SPM", "0.0M")
+    with colket[2]:
+        if "PBK KIRIM" in ket.index:
+            st.metric(
+                "PBK KIRIM",
+                format_angka(ket.loc["PBK KIRIM", "2023"]),
+                delta=format_angka(ket.loc["PBK KIRIM", "2023"]),
+            )
+        else:
+            st.metric("PBK KIRIM", "0.0M")
+    with colket[3]:
+        if "PBK TERIMA" in ket.index:
+            st.metric(
+                "PBK TERIMA",
+                format_angka(ket.loc["PBK TERIMA", "2023"]),
+                delta=format_angka(ket.loc["PBK TERIMA", "selisih"]),
+            )
+        else:
+            st.metric("PBK TERIMA", "0.0M")
+    with colket[4]:
+        if "SPMKP" in ket.index:
+            st.metric(
+                "SPMKP",
+                format_angka(ket.loc["SPMKP", "2023"]),
+                delta=format_angka(ket.loc["SPMKP", "selisih"]),
+            )
+        else:
+            st.metric("SPMKP", "0.0M")
     with st.expander("keterangan"):
         keterangan = """
         - Target : Per KPP, atau sesuai KPP yang dipilih, atau Kanwil
@@ -273,10 +358,10 @@ elif st.session_state["authentication_status"]:
         - Capaian : Per KPP, atau KPP yg dipilih
         """
         st.markdown(keterangan)
-    st.markdown(
-        """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
-        unsafe_allow_html=True,
-    )
+    # st.markdown(
+    #     """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
+    #     unsafe_allow_html=True,
+    # )
 
     # linechart--------------------
 
@@ -332,11 +417,10 @@ elif st.session_state["authentication_status"]:
             plot_bgcolor="rgba(0, 0, 0, 0)",
             autosize=True,
         )
-
         line = px.line(
             linedata,
             x="BULANBAYAR",
-            y=linedata["kumulatif"],
+            y=linedata["capaian_kumulatif"],
             color="TAHUNBAYAR",
             text=linedata["capaian_kumulatif"].apply(lambda x: "{:,.2f}%".format(x)),
             height=380,
@@ -376,57 +460,42 @@ elif st.session_state["authentication_status"]:
     except:
         st.subheader("🪂No Data Available🪂")
 
-    # KET-----------------------------------------------------------------------
-    ket = data_ket(filter, filter22).set_index("KET")
+    # ----------------------------------------------------------------------------------------------
+    data_sankey, data_node = data_sankey(filter)
 
-    colket = st.columns(5)
-    with colket[0]:
-        if "MPN" in ket.index:
-            # format_number = "{:,.1f}M" if ket.loc["MPN", "2023"] >= 0 else "{:,.1f}M"
-            # format_number_T = "{:,.1f}T" if ket.loc["MPN", "2023"] >= 0 else "{:,.1f}T"
-            st.metric(
-                "MPN",
-                format_angka(ket.loc["MPN", "2023"]),
-                delta=format_angka(ket.loc["MPN", "selisih"]),
+    sankey_chart = go.Figure(
+        data=[
+            go.Sankey(
+                node=dict(
+                    pad=15,
+                    thickness=20,
+                    line=dict(color="blue", width=0.5),
+                    label=data_node["label"],
+                    color=n_color(),
+                ),
+                link=dict(
+                    source=data_sankey["source"],
+                    target=data_sankey["target"],
+                    value=data_sankey["value"],
+                    color=n_color(),
+                ),
+                valueformat=".2s",
             )
-        else:
-            st.metric("MPN", "0M")
-    with colket[1]:
-        if "SPM" in ket.index:
-            st.metric(
-                "SPM",
-                format_angka(ket.loc["SPM", "2023"]),
-                delta=format_angka(ket.loc["SPM", "selisih"]),
-            )
-        else:
-            st.metric("SPM", "0.0M")
-    with colket[2]:
-        if "PBK KIRIM" in ket.index:
-            st.metric(
-                "PBK KIRIM",
-                format_angka(ket.loc["PBK KIRIM", "2023"]),
-                delta=format_angka(ket.loc["PBK KIRIM", "2023"]),
-            )
-        else:
-            st.metric("PBK KIRIM", "0.0M")
-    with colket[3]:
-        if "PBK TERIMA" in ket.index:
-            st.metric(
-                "PBK TERIMA",
-                format_angka(ket.loc["PBK TERIMA", "2023"]),
-                delta=format_angka(ket.loc["PBK TERIMA", "selisih"]),
-            )
-        else:
-            st.metric("PBK TERIMA", "0.0M")
-    with colket[4]:
-        if "SPMKP" in ket.index:
-            st.metric(
-                "SPMKP",
-                format_angka(ket.loc["SPMKP", "2023"]),
-                delta=format_angka(ket.loc["SPMKP", "selisih"]),
-            )
-        else:
-            st.metric("SPMKP", "0.0M")
+        ]
+    )
+    sankey_chart.update_layout(
+        height=860,
+        title=dict(
+            text="Sebaran Penerimaan Sektor ke Jenis Pajak",
+            font=dict(color="slategrey", size=26),
+            x=0.3,
+            y=0.95,
+        ),
+        paper_bgcolor="rgba(0, 0, 0, 0)",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
+    )
+    with chart_container(data_sankey):
+        st.plotly_chart(sankey_chart, use_container_width=True)
 
     # PERSEKTOR-------------------------------------------------------------------------------
     try:
@@ -511,6 +580,7 @@ elif st.session_state["authentication_status"]:
         data_sektor_table = sektor_yoy(filter, filter22, includewp=True)[2]
         data_sektor_table = data_sektor_table[
             [
+                "NAMA_WP",
                 "NM_KATEGORI",
                 "BRUTO2022",
                 "BRUTO2023",
@@ -526,6 +596,7 @@ elif st.session_state["authentication_status"]:
             st.dataframe(
                 filter_dataframe(data_sektor_table, key=unique_key(5)),
                 use_container_width=True,
+                hide_index=True,
             )
 
         klu_data = klu(filter)
@@ -637,7 +708,9 @@ elif st.session_state["authentication_status"]:
             #     ["NAMA_WP", "MAP", "TAHUNBAYAR", "JENIS_WP","2022", "KONTRIBUSI2022", "2023", "KONTRIBUSI2023", "TUMBUH"]
             # ]
             st.dataframe(
-                filter_dataframe(jenis_wp, key=unique_key(45)), use_container_width=True
+                filter_dataframe(jenis_wp, key=unique_key(45)),
+                use_container_width=True,
+                hide_index=True,
             )
 
         kjs = kjs(filter)
@@ -762,6 +835,7 @@ elif st.session_state["authentication_status"]:
                     st.dataframe(
                         filter_dataframe(bruto, key=unique_key(23)),
                         use_container_width=True,
+                        hide_index=True,
                     )
             with tab_wp[1]:
                 with chart_container(topwp):
@@ -883,8 +957,10 @@ elif st.session_state["authentication_status"]:
                 )
                 with chart_container(botwp):
                     st.plotly_chart(table_bot, use_container_width=True)
-
+    except:
+        st.subheader("🪂 No Data Available🪂")
         # CLUSTER KPP ------------------------------------------------------------------------------------
+    try:
         capaian = cluster(filter, filter22, kpp)
         capaian_table = capaian.copy()
         capaian_table.loc[:, "TARGET2023":"REALISASI2023"] = capaian_table.loc[
@@ -893,7 +969,7 @@ elif st.session_state["authentication_status"]:
         capaian_table.loc[:, "capaian":] = capaian_table.loc[:, "capaian":].applymap(
             lambda x: "{:,.2f}%".format(x)
         )
-        capaian_table = ff.create_table(capaian_table)
+        # capaian_table = ff.create_table(capaian_table)
         avg_capaian = capaian["capaian"].mean()
         avg_tumbuh = capaian["tumbuh"].mean()
 
@@ -931,15 +1007,74 @@ elif st.session_state["authentication_status"]:
             )
         )
         cluster_chart.update_layout(
-            paper_bgcolor="#F6FFF8",
+            title=dict(
+                text="Clustering Capaian & Tumbuh Unit Kerja(Bruto)",
+                font=dict(color="slategrey", size=26),
+                x=0.3,
+                y=0.95,
+            ),
+            # paper_bgcolor="#F6FFF8",
             plot_bgcolor="rgba(0, 0, 0, 0)",
         )
-        st.subheader("Clustering Capaian Unit Kerja")
-        st.plotly_chart(cluster_chart, use_container_width=True)
-
-        st.plotly_chart(capaian_table, use_container_width=True)
-        st.subheader("Clustering Wajib Pajak Madya(underconstruction)")
-        st.subheader("Clustering 100 Wajib Pajak Besar KPP Pratama(underconstruction)")
+        with chart_container(capaian_table):
+            st.plotly_chart(cluster_chart, use_container_width=True)
     except:
         st.subheader("🪂 No Data Available🪂")
+
+    top10kpp = top10kpp(filter_date, filter_date22, filter_cat)
+    top10kpp = top10kpp[~top10kpp["ADMIN"].isin(["007", "097"])]
+    avg_realisasi = top10kpp["CY"].mean()
+    avg_tumbuh_kpp = top10kpp["TUMBUH"].mean()
+    cluster_top10kpp = px.scatter(
+        top10kpp,
+        x="CY",
+        y="TUMBUH",
+        # text="NAMA_WP",
+        color="ADMIN",
+        color_continuous_scale=px.colors.diverging.RdBu,
+        custom_data=["NAMA_WP", "PY"],
+    )
+    hovertemplate = (
+        "<b>%{customdata[0]}</b><br><br>"
+        + "Current Year: %{x:,.0f} <br>"
+        + "Prior Year: %{customdata[1]:,.0f}<br>"
+        + "Tumbuh: %{y:,.2f}persen <extra></extra>"
+    )
+    cluster_top10kpp.update_traces(
+        marker=dict(size=10),
+        textposition="bottom center",
+        textfont=dict(color="#F86F03", size=14),
+        hovertemplate=hovertemplate,
+    )
+    cluster_top10kpp.add_hline(
+        y=avg_tumbuh_kpp, line_dash="dash", line_color="red", name="Rata2 Tumbuh"
+    )
+    cluster_top10kpp.add_vline(
+        x=avg_realisasi, line_dash="dash", line_color="red", name="Rata2 Capaian"
+    )
+    cluster_top10kpp.add_trace(
+        go.Scatter(
+            x=[avg_realisasi],
+            y=[avg_tumbuh_kpp],
+            mode="markers",
+            marker=dict(color="green", symbol="x", size=20),
+            name="Rata-rata",
+        )
+    )
+    cluster_top10kpp.update_layout(
+        title=dict(
+            text="Clustering 10 WP Besar per KPP Pratama(Bruto)",
+            font=dict(color="slategrey", size=26),
+            x=0.3,
+            y=0.95,
+        ),
+        xaxis={"visible": False},
+        yaxis={"visible": False},
+        # paper_bgcolor="#F6FFF8",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
+    )
+
+    with chart_container(top10kpp):
+        st.plotly_chart(cluster_top10kpp, use_container_width=True)
+
     # target2023

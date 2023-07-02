@@ -3,6 +3,7 @@ from sqlalchemy import create_engine
 from urllib.parse import quote_plus
 import calendar
 import streamlit as st
+import random
 
 conn = st.experimental_connection("ppmpkm", type="sql")
 dict_sektor = {
@@ -173,7 +174,7 @@ def sektor_yoy(filter, filter22, includewp: bool):
         data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
 
         sektor_yoy = data.pivot_table(
-            index=["NM_KATEGORI"],
+            index=["NAMA_WP", "NM_KATEGORI"],
             columns="TAHUNBAYAR",
             values=["NETTO", "BRUTO"],
             aggfunc="sum",
@@ -814,6 +815,100 @@ def subsektor(filter, filter22):
     # data["Naik/Turun"] = data["2023"] - data["2022"]
     # data["Tumbuh"] = round((data["Naik/Turun"] / data["2022"]) * 100, 2)
 
+    return data
+
+
+def data_sankey(filter):
+    kueri = f"""
+    SELECT 
+    p."NM_KATEGORI" , p."MAP" , sum(p."NOMINAL") 
+    FROM 
+    ppmpkm p 
+    WHERE  {filter}
+    GROUP BY p."NM_KATEGORI" , p."MAP" 
+    """
+    data = conn.query(kueri)
+    data_node = pd.DataFrame(
+        pd.concat(
+            [pd.Series(data["NM_KATEGORI"].unique()), pd.Series(data["MAP"].unique())],
+            ignore_index=True,
+            axis=0,
+        ),
+        columns=["label"],
+    ).reset_index()
+    data = data.merge(
+        data_node[["index", "label"]],
+        left_on="NM_KATEGORI",
+        right_on="label",
+        how="left",
+    )
+    data = data.merge(
+        data_node[["index", "label"]], left_on="MAP", right_on="label", how="left"
+    )
+    data.rename(
+        columns={"index_x": "source", "index_y": "target", "sum": "value"}, inplace=True
+    )
+    data.drop(columns=["label_x", "label_y"], inplace=True)
+    return [data, data_node]
+
+
+def generate_rgba_colors(n, a):
+    colors = []
+    for _ in range(n):
+        r, g, b = random.uniform(1, 255), random.uniform(1, 255), random.uniform(1, 255)
+        colors.append((r, g, b))
+    colors = pd.DataFrame(colors, columns=["r", "g", "b"])
+    colors.iloc[:, :] = colors.iloc[:, :].applymap(lambda x: "{:.0f}".format(x))
+
+    colors["rgba"] = (
+        "rgba("
+        + colors["r"]
+        + ","
+        + colors["g"]
+        + ","
+        + colors["b"]
+        + ","
+        + str(a)
+        + ")"
+    )
+    return colors
+
+
+def top10kpp(filter_date, filter_date22, filter_cat):
+    if filter_cat:
+        kueri = f""" 
+        WITH df AS (SELECT 
+        p."NPWP15", p."NAMA_WP" , p."ADMIN" ,
+        sum(CASE WHEN p."TAHUNBAYAR"=EXTRACT (YEAR FROM current_date) THEN p."NOMINAL" END )AS "CY", 
+        sum(CASE WHEN p."TAHUNBAYAR"=EXTRACT (YEAR FROM current_date)-1 THEN p."NOMINAL" END )AS "PY",
+        row_number() over(PARTITION BY "ADMIN" ORDER BY 
+        sum(CASE WHEN p."TAHUNBAYAR"=EXTRACT (YEAR FROM current_date) THEN p."NOMINAL" END ) DESC) AS "URUT"
+        FROM ppmpkm p 
+        WHERE "KET" in('MPN','SPM')  AND "NPWP15" NOT LIKE '000000000%' and (({filter_date})or ({filter_date22})) and {filter_cat}
+        GROUP BY p."NPWP15", p."NAMA_WP" ,p."ADMIN" 
+        HAVING sum(CASE WHEN p."TAHUNBAYAR"=EXTRACT (YEAR FROM current_date) THEN p."NOMINAL" END ) NOTNULL )
+        SELECT * , (("CY"-"PY")/"PY")*100 AS "TUMBUH"
+        FROM df
+        WHERE "URUT" <=10
+        """
+    else:
+        kueri = f""" 
+        WITH df AS (SELECT 
+        p."NPWP15", p."NAMA_WP" , p."ADMIN" ,
+        sum(CASE WHEN p."TAHUNBAYAR"=EXTRACT (YEAR FROM current_date) THEN p."NOMINAL" END )AS "CY", 
+        sum(CASE WHEN p."TAHUNBAYAR"=EXTRACT (YEAR FROM current_date)-1 THEN p."NOMINAL" END )AS "PY",
+        row_number() over(PARTITION BY "ADMIN" ORDER BY 
+        sum(CASE WHEN p."TAHUNBAYAR"=EXTRACT (YEAR FROM current_date) THEN p."NOMINAL" END ) DESC) AS "URUT"
+        FROM ppmpkm p 
+        WHERE "KET" in('MPN','SPM')  AND "NPWP15" NOT LIKE '000000000%' and (({filter_date})or ({filter_date22}))
+        GROUP BY p."NPWP15", p."NAMA_WP" ,p."ADMIN" 
+        HAVING sum(CASE WHEN p."TAHUNBAYAR"=EXTRACT (YEAR FROM current_date) THEN p."NOMINAL" END ) NOTNULL )
+        SELECT * , (("CY"-"PY")/"PY")*100 AS "TUMBUH"
+        FROM df
+        WHERE "URUT" <=10
+        """
+    data = conn.query(kueri)
+    # data["TUMBUH"] = data["TUMBUH"].round(2)
     return data
 
 

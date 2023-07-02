@@ -90,21 +90,30 @@ else:
         add_logo("assets/unit.png", height=150)
         st.text(f"Salam Satu Bahu {st.session_state['name']}")
 
+    # Main apps
+    col_filter = st.columns([1, 1, 1, 2, 2, 2, 2])
+    with col_filter[0]:
         mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
         start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
+    with col_filter[1]:
         end = st.date_input("Tgl Akhir", max_value=date.today())
+    with col_filter[2]:
         kpp = conn.query('select distinct "ADMIN" from ppmpkm where "ADMIN" notnull')
         kpp = st.multiselect("KPP", options=kpp.iloc[:, 0].tolist())
+    with col_filter[3]:
         map = conn.query('select distinct "MAP" from ppmpkm where "MAP" notnull')
         map = st.multiselect("MAP", options=map.iloc[:, 0].tolist())
+    with col_filter[4]:
         sektor = conn.query(
             'select distinct "NM_KATEGORI" from ppmpkm where "NM_KATEGORI" notnull'
         )
         sektor = st.multiselect("SEKTOR", options=sektor.iloc[:, 0].tolist())
+    with col_filter[5]:
         segmen = conn.query(
             """select distinct "SEGMENTASI_WP" from ppmpkm where "SEGMENTASI_WP" notnull and "SEGMENTASI_WP"!='' """
         )
         segmen = st.multiselect("SEGMENTASI", options=segmen.iloc[:, 0].tolist())
+    with col_filter[6]:
         # wp
         wp = conn.query(
             """select distinct "NAMA_WP" from ppmpkm where "NAMA_WP" notnull and "NAMA_WP"!=''
@@ -116,8 +125,6 @@ else:
     filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
     filter = "and".join(x for x in filter_gabungan[0])
     filter22 = "and".join(x for x in filter_gabungan[1])
-
-    # Main apps
     style_metric_cards(
         background_color="rgba(0,0,0,0)",
         border_color="rgba(0,0,0,0)",
