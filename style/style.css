@@ -1,7 +1,12 @@
 [data-testid="stForm"] {
   margin: 0rem 10rem;
 }
-
+.css-y4bq5x {
+  justify-content: center;
+}
+[data-testid="stText"] {
+  color: #005fac;
+}
 /* [data-testid="stAppViewContainer"] {
   background-color: #f4f7f5;
 } */
@@ -93,7 +98,7 @@ div.css-j5r0tf.esravye1 {
 }
 
 .css-z5fcl4 {
-  padding: 1rem 1rem 1rem;
+  padding: 1rem 0.5rem;
 }
 
 #tabs-bui70-tabpanel-0 {
@@ -134,9 +139,9 @@ footer {
   background-color: #005fac;
   color: white;
 }
-[data-testid="stText"] {
+/* [data-testid="stText"] {
   color: white;
-}
+} */
 div.st-di {
   color: white;
 }
@@ -148,5 +153,5 @@ div.stCheckbox {
   color: white;
 }
 button[kind="secondary"] {
-  background-color: #9db2bf;
+  background-color: #005fac;
 }

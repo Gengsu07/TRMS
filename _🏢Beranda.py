@@ -15,6 +15,7 @@ import yaml
 import streamlit_authenticator as stauth
 import streamlit as st
 import random
+from streamlit_toggle import st_toggle_switch
 
 st.set_page_config(
     page_title="Tax Revenue Monitoring Sistem",
@@ -57,13 +58,13 @@ def unique_key(seed: int):
     return random.choice(list(range(1, 1000)))
 
 
-def n_color():
+def n_color(df):
     # opacity_sankey = st.select_slider(
     #     "kecerahan",
     #     options=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
     #     value=0.5,
     # )
-    n_color = generate_rgba_colors(len(data_sankey), 0.5)
+    n_color = generate_rgba_colors(len(df), 0.5)
     n_color = n_color["rgba"]
     return n_color
 
@@ -163,26 +164,37 @@ elif st.session_state["authentication_status"] is None:
 elif st.session_state["authentication_status"]:
     # Sidebar----------------------------------------------------------------------------
     with st.sidebar:
+        add_logo("assets/unit.png", height=150)
+
+    # Main apps-----------------------------------------------------------------------
+
+    colmain = st.columns([1, 4, 1])
+    with colmain[0]:
+        st.image("assets/unit.png", width=150)
+        switch = st_toggle_switch(
+            label="Darkmode",
+            key="switch_1",
+            default_value=False,
+            label_after=False,
+            inactive_color="#D3D3D3",  # optional
+            active_color="#11567f",  # optional
+            track_color="#29B5E8",  # optional
+        )
+
+    with colmain[1]:
+        st.header("Tax Revenue Monitoring Sistem🚀")
+        st.text(f" Salam Satu Bahu: {name}")
+    with colmain[2]:
         if st.session_state["authentication_status"]:
-            authenticator.logout("Logout", "sidebar")
-            st.text(f"Salam Satu Bahu: {name}")
-        theme = st.radio("Darkmode:", ["on", "off"], horizontal=True, index=1)
-        if theme == "on":
+            authenticator.logout("Logout", "main")
+
+        if switch:
             with open("style/darkmode.css") as f:
                 st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
             st.session_state["darkmode"] = "on"
         else:
             st.session_state["darkmode"] = "off"
-        add_logo("assets/unit.png", height=150)
 
-    # Main apps-----------------------------------------------------------------------
-    colmain = st.columns([1, 4, 1])
-    with colmain[0]:
-        st.image("assets/unit.png", width=150)
-    with colmain[1]:
-        st.header("Tax Revenue Monitoring Sistem🚀")
-    with colmain[2]:
-        st.image("assets/unit.png", width=150)
     # st.markdown(
     #     """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
     #     unsafe_allow_html=True,
@@ -471,13 +483,13 @@ elif st.session_state["authentication_status"]:
                     thickness=20,
                     line=dict(color="blue", width=0.5),
                     label=data_node["label"],
-                    color=n_color(),
+                    color=n_color(data_sankey),
                 ),
                 link=dict(
                     source=data_sankey["source"],
                     target=data_sankey["target"],
                     value=data_sankey["value"],
-                    color=n_color(),
+                    color=n_color(data_sankey),
                 ),
                 valueformat=".2s",
             )

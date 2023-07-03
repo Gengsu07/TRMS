@@ -10,7 +10,13 @@ import plotly.figure_factory as ff
 import plotly.express as px
 from math import ceil
 import plotly.graph_objects as go
-from scripts.db import sektor_yoy, growth_month, subsektor
+from scripts.db import (
+    sektor_yoy,
+    growth_month,
+    subsektor,
+    sankey_subsektor,
+    generate_rgba_colors,
+)
 
 
 if "darkmode" not in st.session_state:
@@ -29,6 +35,17 @@ def list_to_sql(column, value):
     value_str = ",".join([f"'{x}'" for x in value])
     sql_filter = f'"{column}" IN ({value_str})'
     return sql_filter
+
+
+def n_color(df):
+    # opacity_sankey = st.select_slider(
+    #     "kecerahan",
+    #     options=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
+    #     value=0.5,
+    # )
+    n_color = generate_rgba_colors(len(df), 0.5)
+    n_color = n_color["rgba"]
+    return n_color
 
 
 def cek_filter(start, end, kpp, map, sektor, segmen, wp):
@@ -91,6 +108,16 @@ else:
         st.text(f"Salam Satu Bahu {st.session_state['name']}")
 
     # Main apps
+    colmain = st.columns([1, 4, 1])
+    with colmain[0]:
+        st.image("assets/unit.png", width=150)
+    with colmain[1]:
+        st.header("Tax Revenue Monitoring Sistem🚀")
+        name = st.session_state["name"]
+        st.text(f" Salam Satu Bahu: {name}")
+    with colmain[2]:
+        st.image("assets/unit.png", width=150)
+
     col_filter = st.columns([1, 1, 1, 2, 2, 2, 2])
     with col_filter[0]:
         mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
@@ -295,11 +322,61 @@ else:
     # SUBSEKTOR---------------------------------------------------------------------------
     st.subheader("🔭SubSektor🩺")
     data_subsektor = subsektor(filter, filter22)
+
     with chart_container(data_subsektor):
         nama_sektor = data_subsektor["NM_KATEGORI"].unique().tolist()
         tab_subsekstor = st.selectbox("Pilih Sektor:", nama_sektor)
+        if tab_subsekstor:
+            subsektor_df = data_subsektor[
+                data_subsektor["NM_KATEGORI"] == tab_subsekstor
+            ]
+        else:
+            subsektor_df = data_subsektor.copy()
 
-        subsektor_df = data_subsektor[data_subsektor["NM_KATEGORI"] == tab_subsekstor]
+        node_subsektor, sankey_subsektor = sankey_subsektor(
+            subsektor_df, tab_subsekstor
+        )
+
+        sankey_subsektor.drop(columns="NAMA_KLU", inplace=True)
+        sankey_subsektor = sankey_subsektor[sankey_subsektor["NM_KATEGORI"] != ""]
+        # sankey_subsektor = (
+        #     sankey_subsektor.groupby(["NM_KATEGORI", "Sub Sektor"]).sum().reset_index()
+        # )
+
+        sankey_subsektor_chart = go.Figure(
+            data=[
+                go.Sankey(
+                    node=dict(
+                        pad=15,
+                        thickness=20,
+                        line=dict(color="blue", width=0.5),
+                        label=node_subsektor["label"],
+                        color=n_color(sankey_subsektor),
+                    ),
+                    link=dict(
+                        source=sankey_subsektor["source"],
+                        target=sankey_subsektor["target"],
+                        value=sankey_subsektor["2023"],
+                        color=n_color(sankey_subsektor),
+                    ),
+                    valueformat=".2s",
+                )
+            ]
+        )
+        sankey_subsektor_chart.update_layout(
+            height=860,
+            title=dict(
+                text="Sebaran Penerimaan Sektor ke Subsektor",
+                font=dict(color="slategrey", size=26),
+                x=0.3,
+                y=0.95,
+            ),
+            paper_bgcolor="rgba(0, 0, 0, 0)",
+            plot_bgcolor="rgba(0, 0, 0, 0)",
+        )
+        with chart_container(subsektor_df):
+            st.plotly_chart(sankey_subsektor_chart, use_container_width=True)
+
         subsektor_table = subsektor_df.drop(columns=["NM_KATEGORI", "NAMA_KLU"])
         subsektor_table = subsektor_table.groupby("Sub Sektor").sum().reset_index()
         subsektor_table["Selisih"] = subsektor_table["2023"] - subsektor_table["2022"]
@@ -307,7 +384,7 @@ else:
             subsektor_table["Selisih"] / subsektor_table["2022"]
         ) * 100
 
-        klu_df = subsektor_df.drop(columns=["NM_KATEGORI"])
+        klu_df = subsektor_df.drop(columns=["NM_KATEGORI", "Sub Sektor"])
         klu_df = klu_df.groupby("NAMA_KLU").sum().reset_index()
         klu_df["Selisih"] = klu_df["2023"] - klu_df["2022"]
         klu_df["Tumbuh"] = (klu_df["Selisih"] / klu_df["2022"]) * 100
@@ -315,8 +392,8 @@ else:
         # colorscale = [[0, "#005FAC"], [0.5, "#f2e5ff"], [1, "#ffffff"]]
         # subsektor_df = ff.create_table(subsektor_df, colorscale=colorscale)
 
-        st.dataframe(subsektor_table, use_container_width=True)
-        st.dataframe(klu_df, use_container_width=True)
+        st.dataframe(subsektor_table, use_container_width=True, hide_index=True)
+        st.dataframe(klu_df, use_container_width=True, hide_index=True)
     # TUMBUH BULANAN-----------------------------------------------------------------------
     st.subheader("💡 Pertumbuhan Bulanan")
     tumbuh_bulanan = growth_month(filter, filter22)
@@ -330,7 +407,7 @@ else:
     )
 
     with chart_container(tumbuh_bulanan):
-        colorscale = [[0, "#2c5a7b"], [0.5, "#f2e5ff"], [1, "#ffffff"]]
+        colorscale = [[0, "#005fac"], [0.5, "#f2e5ff"], [1, "#ffffff"]]
         tumbuh = ff.create_table(tumbuh_bulanan, colorscale=colorscale)
 
         st.plotly_chart(tumbuh, use_container_width=True)

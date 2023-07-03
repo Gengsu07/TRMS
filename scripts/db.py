@@ -852,6 +852,55 @@ def data_sankey(filter):
     return [data, data_node]
 
 
+def sankey_subsektor(df: pd.DataFrame, tab_subsektor):
+    if tab_subsektor:
+        df = df[df["NM_KATEGORI"] == tab_subsektor]
+        node_subsektor = pd.DataFrame(
+            pd.concat(
+                [
+                    pd.Series(df["NM_KATEGORI"].unique()),
+                    pd.Series(df["Sub Sektor"].unique()),
+                ],
+                ignore_index=True,
+                axis=0,
+            ),
+            columns=["label"],
+        ).reset_index()
+    else:
+        df = df.copy()
+        node_subsektor = pd.DataFrame(
+            pd.concat(
+                [
+                    pd.Series(df["NM_KATEGORI"].unique()),
+                    pd.Series(df["Sub Sektor"].unique()),
+                ],
+                ignore_index=True,
+                axis=0,
+            ),
+            columns=["label"],
+        ).reset_index()
+
+    df = df.merge(
+        node_subsektor[["index", "label"]],
+        left_on="NM_KATEGORI",
+        right_on="label",
+        how="left",
+    )
+    df = df.merge(
+        node_subsektor[["index", "label"]],
+        left_on="Sub Sektor",
+        right_on="label",
+        how="left",
+    )
+
+    df.rename(
+        columns={"index_x": "source", "index_y": "target", "sum": "value"}, inplace=True
+    )
+    df.drop(columns=["label_x", "label_y"], inplace=True)
+
+    return [node_subsektor, df]
+
+
 def generate_rgba_colors(n, a):
     colors = []
     for _ in range(n):
