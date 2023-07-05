@@ -434,7 +434,7 @@ def kjs(filter):
 def kpi(filter, filter22, filter_date, filter_date22):
     mpn23 = conn.query(
         f""" SELECT
-            sum( CASE WHEN p."KET" in('MPN','SPM') THEN p."NOMINAL" END) AS "BRUTO" ,
+            sum( CASE WHEN p."KET" !='SPMKP' THEN p."NOMINAL" END) AS "BRUTO" ,
             sum( p."NOMINAL") AS "NETTO" ,
             (sum( p."NOMINAL" ) / 
             (
@@ -452,7 +452,7 @@ def kpi(filter, filter22, filter_date, filter_date22):
     )
     mpn22 = conn.query(
         f""" SELECT
-            sum( CASE WHEN p."KET" in('MPN','SPM') THEN p."NOMINAL" END) AS "BRUTO" ,
+            sum( CASE WHEN p."KET" !='SPMKP' THEN p."NOMINAL" END) AS "BRUTO" ,
             sum( p."NOMINAL") AS "NETTO" ,
             (sum( p."NOMINAL") / 
             (

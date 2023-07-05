@@ -6,4 +6,4 @@ streamlit-extras
 streamlit-authenticator
 plotly
 entrypoints
-streamlit-echarts
+streamlit-option-menu

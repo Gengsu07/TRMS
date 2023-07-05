@@ -16,6 +16,7 @@ import streamlit_authenticator as stauth
 import streamlit as st
 import random
 from streamlit_toggle import st_toggle_switch
+from st_on_hover_tabs import on_hover_tabs
 
 st.set_page_config(
     page_title="Tax Revenue Monitoring Sistem",
@@ -474,7 +475,7 @@ elif st.session_state["authentication_status"]:
 
     # ----------------------------------------------------------------------------------------------
     data_sankey, data_node = data_sankey(filter)
-
+    label = ["<b>" + label + "</b>" for label in data_node["label"].tolist()]
     sankey_chart = go.Figure(
         data=[
             go.Sankey(
@@ -482,7 +483,7 @@ elif st.session_state["authentication_status"]:
                     pad=15,
                     thickness=20,
                     line=dict(color="blue", width=0.5),
-                    label=data_node["label"],
+                    label=label,
                     color=n_color(data_sankey),
                 ),
                 link=dict(
@@ -588,7 +589,10 @@ elif st.session_state["authentication_status"]:
         )  # autorange="reversed"
         with chart_container(data_sektor):
             st.plotly_chart(sektor_chart, use_container_width=True)
+    except:
+        st.subheader("🪂 No Data Available🪂")
         # data
+    try:
         data_sektor_table = sektor_yoy(filter, filter22, includewp=True)[2]
         data_sektor_table = data_sektor_table[
             [
@@ -649,16 +653,11 @@ elif st.session_state["authentication_status"]:
         with chart_container(klu_data.sort_values(by="BRUTO", ascending=False)):
             st.plotly_chart(kluchart, use_container_width=True)
 
-    except:
-        st.subheader("🪂 No Data Available🪂")
-
-    st.markdown(
-        """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
-        unsafe_allow_html=True,
-    )
-    # JENIS PAJAK----------------------------------------------------------------------------------------
-
-    try:
+        st.markdown(
+            """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
+            unsafe_allow_html=True,
+        )
+        # JENIS PAJAK----------------------------------------------------------------------------------------
         jenis_pajak, jenis_pajak9 = jns_pajak(filter, filter22, includewp=False)
 
         jenis_pajak9 = jenis_pajak9.sort_values(by="BRUTO2023", ascending=True)
@@ -760,13 +759,13 @@ elif st.session_state["authentication_status"]:
         )
         with chart_container(kjs):
             st.plotly_chart(kjschart, use_container_width=True)
+
+        st.markdown(
+            """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
+            unsafe_allow_html=True,
+        )
     except:
         st.subheader("🪂 No Data Available🪂")
-
-    st.markdown(
-        """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
-        unsafe_allow_html=True,
-    )
 
     # TOP10-----------------------------------------------------------------------------------
 

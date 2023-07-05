@@ -1,3 +1,7 @@
+.css-18edgy2 {
+  position: sticky;
+}
+
 [data-testid="stForm"] {
   margin: 0rem 10rem;
 }
@@ -111,12 +115,12 @@ div.css-j5r0tf.esravye1 {
 footer {
   visibility: hidden;
 }
-[data-testid="stSidebar"] {
+/* [data-testid="stSidebar"] {
   background-color: #2c5a7b;
   border: 1px solid rgb(248, 229, 229);
   box-shadow: 0 0 3px rgba(250, 242, 242, 0.767);
   border-radius: 3px;
-}
+} */
 .css-pkbazv,
 .css-17lntkn,
 .css-nqowgj {
@@ -130,15 +134,17 @@ footer {
 .css-fblp2m {
   background-color: #2c5a7b;
 }
-.css-81oif8 {
-  /* background-color: #005fac; */
-  color: black;
+.css-81oif8,
+.css-ue6h4q {
+  background-color: #005fac;
+  color: white;
   padding-left: 1rem;
 }
 .css-81oif8.e1oyb3mv3 {
   background-color: #005fac;
   color: white;
 }
+
 /* [data-testid="stText"] {
   color: white;
 } */
