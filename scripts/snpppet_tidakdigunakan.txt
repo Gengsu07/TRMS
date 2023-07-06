@@ -1,0 +1,290 @@
+[theme]
+base="dark"
+primaryColor="#bd93f9"
+backgroundColor="#282a36"
+secondaryBackgroundColor="#44475a"
+textColor="#fff"
+#textColor="#f8f8f2"
+
+
+# renpen_realisasi
+renpen_realisasi = conn.query('select * from renpen_realisasi')
+renpen_realisasi = renpen_realisasi.groupby(
+    ['BULAN', 'JENIS'])['JUMLAH'].sum().reset_index()
+renpen_realisasi['text'] = renpen_realisasi['JUMLAH'].apply(lambda x: "{:,.1f}M".format(
+    x/1000000000))
+linechart = px.line(renpen_realisasi, x='BULAN',
+                    y='JUMLAH', color='JENIS', text='text', width=960)
+linechart.update_layout(xaxis_title='', yaxis_title='',
+                        yaxis={'visible': False},
+                        xaxis={
+                            'dtick': 0.1,
+                            'tickmode': 'array',
+                            'tickvals': [x for x in range(1, 13)],
+                            'ticktext': [calendar.month_name[i] for i in range(1, 13)]
+                        }, autosize=True)
+
+with chart_container(renpen_realisasi):
+    st.plotly_chart(linechart)
+
+
+## HOUSEHOLD CORPORATE
+SELECT 
+wp.JENIS_WP , sum(pp.NOMINAL) 
+FROM ppm_pkm pp
+LEFT JOIN ( 
+		SELECT
+		NPWP15, JENIS_WP
+		FROM 
+		registrasi.sidjp_masterfile 
+)wp
+ON pp.NPWP  = wp.NPWP15 
+WHERE pp.DATEBAYAR BETWEEN '20230401' AND  '20230431'
+GROUP BY wp.JENIS_WP 
+
+
+
+sektor_bruto = go.Bar(
+        x=data_sektor["BRUTO"],
+        y=data_sektor["NM_KATEGORI"],
+        name="BRUTO",
+        orientation="h",
+        text=data_sektor["bruto_text"],
+        marker=dict(color="#ffc91b"),
+        textangle=0,
+        textposition="auto",
+    )
+
+    sektor_net = go.Bar(
+        x=data_sektor["NETTO"],
+        y=data_sektor["NM_KATEGORI"],
+        name="NETTO",
+        orientation="h",
+        text=data_sektor["net_text"],
+        marker=dict(color="#005FAC"),
+        textangle=0,
+    )
+
+    # sektor_kontrib = go.Funnel(
+    #     x=data_sektor["kontribusi"],
+    #     y=data_sektor["NM_KATEGORI"],
+    #     name="BRUTO",
+    #     text=data_sektor["kontrib_persen"],
+    #     marker=dict(color="#005FAC"),
+    #     textangle=0,
+    #     textposition="inside",
+    # )
+
+    sektor_bar = make_subplots(
+        rows=1,
+        cols=2,
+        shared_yaxes=True,
+        subplot_titles=[f"Neto:{netto_val}", f"Bruto:{bruto_val}"],
+    )
+
+    sektor_bar.add_trace(sektor_net, row=1, col=1)
+    sektor_bar.add_trace(sektor_bruto, row=1, col=2)
+    # sektor_bar.add_trace(sektor_kontrib, row=1, col=3)
+
+
+
+    data_sektor_awal = prep.sektor(filter)
+    data_sektor_awal = (
+        data_sektor_awal.groupby(["NM_KATEGORI"])
+        .sum()
+        .reset_index()
+        .sort_values(by="NETTO", ascending=False)
+        .reset_index()
+        .drop(columns="index")
+    )
+
+    data_sektor9 = data_sektor_awal.nlargest(10, "NETTO")
+    data_sektor_lain = data_sektor_awal[
+        ~data_sektor_awal["NM_KATEGORI"].isin(data_sektor9["NM_KATEGORI"])
+    ]
+    data_sektor_lain = pd.DataFrame(
+        [["LAINNYA", data_sektor_lain["NETTO"].sum(), data_sektor_lain["BRUTO"].sum()]],
+        columns=["NM_KATEGORI", "NETTO", "BRUTO"],
+    )
+    data_sektor = pd.concat([data_sektor9, data_sektor_lain], axis=0, ignore_index=True)
+
+
+
+     with col_tahun[0]:
+        if filter:
+            data23 = conn.query(
+                f"""select sum("NOMINAL") from ppmpkm p where {filter} and p."KET" !='SPMKP' """
+            )["sum"].sum()
+        else:
+            data23 = conn.query(
+                f"""select sum("NOMINAL") from ppmpkm p where {filter_gabungan[0][0] +'and'+ filter_gabungan[0][1]} and p."KET" !='SPMKP' """
+            )["sum"].sum()
+        if (data23 / 1000000000000) > 1:
+            st.metric("Bruto", "{:,.1f}T".format(data23 / 1000000000000))
+        else:
+            st.metric("Bruto", "{:,.1f}M".format(data23 / 1000000000))
+    with col_tahun[1]:
+        if filter:
+            data22 = conn.query(
+                f'select sum("NOMINAL") from ppmpkm p where {filter22}'
+            )["sum"].sum()
+        else:
+            data22 = conn.query(
+                f"""select sum("NOMINAL") from ppmpkm p where {filter_gabungan[1][0] +'and'+ filter_gabungan[1][1]} """
+            )["sum"].sum()
+        if (data22 / 1000000000000) > 1:
+            st.metric("2022", "{:,.1f}T".format(data22 / 1000000000000))
+        else:
+            st.metric("2022", "{:,.1f}M".format(data22 / 1000000000))
+    with col_tahun[2]:
+        selisih = data23 - data22
+        if (selisih) > 1000000000000:
+            st.metric("Kenaikan", "{:,.1f}T".format(selisih / 1000000000000))
+        else:
+            st.metric("Kenaikan", "{:,.1f}M".format(selisih / 1000000000))
+    with col_tahun[3]:
+        selisih = data23 - data22
+        if (data22 == 0) | (selisih == 0):
+            tumbuh = 0
+        else:
+            tumbuh = selisih / data22
+        st.metric("Tumbuh", "{:.1f}%".format(tumbuh * 100))
+    with col_tahun[4]:
+        persentase = data23 / 27601733880000
+        st.metric("Kontrib Target Kanwil", "{:.2f}%".format(persentase * 100))
+
+
+    # timeseries_chart = make_subplots(
+    #     rows=1, cols=2, subplot_titles=["Kumulatif", "Bulanan"]
+    # )
+    # timeseries_chart.add_trace(
+    #     go.Scatter(
+    #         x=linedata["BULANBAYAR"],
+    #         y=linedata["sum"],
+    #         line=dict(color="#005FAC"),
+    #         text=linedata["text"],
+    #         mode="lines",
+    #     ),
+    #     row=1,
+    #     col=1,
+    # )
+
+
+     map_bar = px.bar(
+        jenis_pajak9,
+        x="MAP",
+        y="BRUTO",
+        color="TAHUNBAYAR",
+        text="tbruto",
+        title="Per Jenis(Bruto)",
+        width=1024,
+        height=640,
+        color_discrete_sequence=["#ffc91b", "#005FAC"],
+        barmode="group",
+    )
+    map_bar.update_layout(
+        xaxis_title="",
+        yaxis_title="",
+        yaxis={"visible": False, "minor_showgrid": False},
+        title={"x": 0.5, "font_size": 24},
+        autosize=True,
+    )
+    map_bar.update_traces(
+        textfont_size=12, textangle=0, textposition="outside", cliponaxis=False
+    )
+
+
+
+table
+    go.Figure(
+            data=[
+                go.Table(
+                    header=dict(
+                        values=list(tumbuh_bulanan.columns),
+                        fill_color="#005FAC",
+                        line_color="gray",
+                        align=["center"] * tumbuh_bulanan.shape[1],
+                        font=dict(color="white", size=16),
+                        height=40,
+                    ),
+                    cells=dict(
+                        values=[tumbuh_bulanan[x] for x in tumbuh_bulanan.columns],
+                        fill_color="lavender",
+                        align="left",
+                        font_size=14,
+                        height=30,
+                    ),
+                )
+            ]
+        )
+        tumbuh.update_layout(
+            height=640,
+            width=960,
+            title=dict(
+                text="Tumbuh Bruto & Netto Per Bulan",
+                x=0.5,
+                y=0.95,
+                font=dict(size=26),
+            ),
+        )
+
+# Per Sektor Butterfly
+sektor_chart = make_subplots(
+        rows=1,
+        cols=2,
+        shared_yaxes=True,
+        horizontal_spacing=0,
+    )
+    sektor23 = go.Bar(
+        x=data_sektor["2023"] / 1000000000,
+        y=data_sektor["NM_KATEGORI"],
+        name="2023",
+        orientation="h",
+        text=data_sektor["kontrib_persen23"],
+        texttemplate="%{x:,.1f}M <br> (%{text})",
+        textposition="auto",
+        marker=dict(color="#005FAC"),
+        textangle=0,
+        base=0,
+    )
+
+    sektor22 = go.Bar(
+        x=data_sektor["2022"] / 1000000000,
+        y=data_sektor["NM_KATEGORI"],
+        name="2022",
+        orientation="h",
+        text=data_sektor["kontrib_persen22"],
+        textposition="auto",
+        texttemplate="%{x:,.1f}M<br> (%{text})",
+        marker=dict(color="#ffc91b"),
+        textangle=0,
+        base=0,
+    )
+    sektor_data = [sektor22, sektor23]
+    sektor_layout = go.Layout(barmode="group")
+    sektor_bar = go.Figure(data=sektor_data, layout=sektor_layout)
+
+    # sektor_bar.update_xaxes(visible=False)
+
+    # kontribusi_bar = go.Bar(
+    #     x=data_sektor["kontribusi"],
+    #     y=data_sektor["NM_KATEGORI"],
+    #     name="kontribusi",
+    #     orientation="h",
+    #     text=data_sektor["kontrib_persen"],
+    #     textposition="auto",
+    #     marker=dict(color="#499894"),
+    #     textangle=0,
+    #     base=0,
+    #     showlegend=False,
+    # )
+    # kontrib_layout = go.Layout()
+    # kontribusi_chart = go.Figure(data=kontribusi_bar, layout=kontrib_layout)
+
+    # kontribusi_chart.update_xaxes(visible=False)
+    sektor_chart.add_trace(sektor_bar.data[0], row=1, col=1)
+    sektor_chart.add_trace(sektor_bar.data[1], row=1, col=2)
+    sektor_chart.update_xaxes(
+        row=1, col=1, showticklabels=False
+    )  # autorange="reversed"
+    sektor_chart.update_xaxes(row=1, col=2, showticklabels=False)
