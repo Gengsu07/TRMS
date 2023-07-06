@@ -7,3 +7,5 @@ snippets.py
 __pycache__
 pages/__pycache__
 __init__
+*.xlsx
+*.db
