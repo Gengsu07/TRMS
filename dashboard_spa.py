@@ -18,6 +18,7 @@ import random
 from streamlit_toggle import st_toggle_switch
 from streamlit_option_menu import option_menu
 from math import ceil
+import duckdb
 
 st.set_page_config(
     page_title="Tax Revenue Monitoring Sistem",
@@ -51,7 +52,7 @@ from scripts.db import (
     generate_rgba_colors,
 )
 from scripts.filter_dataframe import filter_dataframe
-
+cred = duckdb.connect('credentials.duckdb')
 # settings
 
 with open("style/style.css") as f:
@@ -62,6 +63,22 @@ conn = st.experimental_connection("ppmpkm", type="sql")
 
 
 # Function/module
+def credential():
+    users = cred.execute('select * from credentials ').df()
+    usernames = [user["NIP"] for user in users]
+    names = [user["Nama"] for user in users]
+    hashed_passwords = [user["PASS_HASHED"] for user in users]
+
+    authenticator = stauth.Authenticate(
+    names,
+    usernames,
+    hashed_passwords,
+    'KilauJaktim@110','byGengsu@110',
+    cookie_expiry_days=30)
+
+    name, authentication_status, username = authenticator.login("👋Login-TRMS👋", "main")
+    return name, authentication_status, username
+
 def unique_key(seed: int):
     random.seed(seed)
     return random.choice(list(range(1, 1000)))
@@ -157,37 +174,31 @@ def format_number(x):
 
 
 # ---AUTHENTICATION-------------------------------------------------------
-with open(".streamlit/login.yaml") as file:
-    config = yaml.load(file, Loader=SafeLoader)
+# with open(".streamlit/login.yaml") as file:
+#     config = yaml.load(file, Loader=SafeLoader)
 
-names = names()
-usernames = usernames()
+# names = names()
+# usernames = usernames()
 # names = passw.names()
 # usernames = passw.usernames()
 if "darkmode" not in st.session_state:
     st.session_state["darkmode"] = "off"
 
-authenticator = stauth.Authenticate(
-    config["credentials"],
-    config["cookie"]["name"],
-    config["cookie"]["key"],
-    config["cookie"]["expiry_days"],
-    config["preauthorized"],
-)
-name, authentication_status, username = authenticator.login("👋Login-TRMS👋", "main")
 
-if st.session_state["authentication_status"] is False:
+name, authentication_status, username = credential()
+st.write(authentication_status)
+if st.authentication_status == False:
     st.error("Username atau Password salah 🫢")
-elif st.session_state["authentication_status"] is None:
+elif authentication_status == None:
     st.warning("Masukan username dan password yang sesuai")
-elif st.session_state["authentication_status"]:
-    # Sidebar----------------------------------------------------------------------------
-    # Main apps-----------------------------------------------------------------------
+elif authentication_status:
+        # Sidebar----------------------------------------------------------------------------
+        # Main apps-----------------------------------------------------------------------
         tabs = option_menu(None,['Dashboard','ALCo','AskData'],
                            icons=["bi bi-speedometer","bi bi-bar-chart","bi bi-messenger"],
                            menu_icon='cast', default_index=0, orientation='horizontal',
                            styles={
-                            "container": {"padding": "3!important", "background-color": "#005fac","max-width":'1320px'},
+                            "container": {"padding": "3!important", "background-color": "#005fac","max-width":'2560px'},
                             "icon": {"color": "orange", "font-size": "14px"}, 
                             "nav-link": {"font-size": "14px", "text-align": "left", "margin":"0px", "--hover-color": "#eee"},
                             "nav-link-selected": {"background-color": "#ffc91b"},
