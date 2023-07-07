@@ -24,7 +24,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-from scripts.login import names, usernames
+from scripts.notuse_ogin import names, usernames
 from scripts.db import (
     data_ket,
     target,
