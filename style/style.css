@@ -1,3 +1,8 @@
+.css-18ni7ap {
+  position: unset;
+  visibility: hidden;
+}
+
 [data-testid="stForm"] {
   margin: 0rem 10rem;
 }
@@ -130,15 +135,17 @@ footer {
 .css-fblp2m {
   background-color: #2c5a7b;
 }
-.css-81oif8 {
+.css-81oif8,
+.css-ue6h4q {
   /* background-color: #005fac; */
-  color: black;
+  color: white;
   padding-left: 1rem;
 }
 .css-81oif8.e1oyb3mv3 {
   background-color: #005fac;
   color: white;
 }
+
 /* [data-testid="stText"] {
   color: white;
 } */
