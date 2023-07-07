@@ -117,7 +117,7 @@ footer {
   visibility: hidden;
 }
 [data-testid="stSidebar"] {
-  background-color: #2c5a7b;
+  background-color: /*#2c5a7b*/ #133c55;
   border: 1px solid rgb(248, 229, 229);
   box-shadow: 0 0 3px rgba(250, 242, 242, 0.767);
   border-radius: 3px;

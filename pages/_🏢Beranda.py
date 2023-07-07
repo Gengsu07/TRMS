@@ -10,13 +10,11 @@ from dateutil.relativedelta import relativedelta
 from datetime import date
 from datetime import datetime
 import pandas as pd
-from yaml.loader import SafeLoader
-import yaml
-import streamlit_authenticator as stauth
 import streamlit as st
 import random
 from streamlit_toggle import st_toggle_switch
-from st_on_hover_tabs import on_hover_tabs
+import components.authenticate as authenticate
+
 
 st.set_page_config(
     page_title="Tax Revenue Monitoring Sistem",
@@ -140,62 +138,54 @@ def format_angka(value):
 
 
 # ---AUTHENTICATION-------------------------------------------------------
-with open(".streamlit/login.yaml") as file:
-    config = yaml.load(file, Loader=SafeLoader)
 
-names = names()
-usernames = usernames()
+
 # names = passw.names()
 # usernames = passw.usernames()
 if "darkmode" not in st.session_state:
     st.session_state["darkmode"] = "off"
 
-authenticator = stauth.Authenticate(
-    config["credentials"],
-    config["cookie"]["name"],
-    config["cookie"]["key"],
-    config["cookie"]["expiry_days"],
-    config["preauthorized"],
-)
-name, authentication_status, username = authenticator.login("👋Login-TRMS👋", "main")
-if st.session_state["authentication_status"] is False:
-    st.error("Username atau Password salah 🫢")
-elif st.session_state["authentication_status"] is None:
-    st.warning("Masukan username dan password yang sesuai")
-elif st.session_state["authentication_status"]:
     # Sidebar----------------------------------------------------------------------------
-    with st.sidebar:
-        add_logo("assets/unit.png", height=150)
-        mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
-        start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
+with st.sidebar:
+    add_logo("assets/unit.png", height=150)
+    # Add login/logout buttons
+    authenticate.set_st_state_vars()
+    if st.session_state["authenticated"]:
+        authenticate.button_logout()
+    else:
+        authenticate.button_login()
+    mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
+    start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
 
-        end = st.date_input("Tgl Akhir", max_value=date.today())
+    end = st.date_input("Tgl Akhir", max_value=date.today())
 
-        kpp = conn.query('select distinct "ADMIN" from ppmpkm where "ADMIN" notnull')
-        kpp = st.multiselect("KPP", options=kpp.iloc[:, 0].tolist())
+    kpp = conn.query('select distinct "ADMIN" from ppmpkm where "ADMIN" notnull')
+    kpp = st.multiselect("KPP", options=kpp.iloc[:, 0].tolist())
 
-        map = conn.query('select distinct "MAP" from ppmpkm where "MAP" notnull')
-        map = st.multiselect("MAP", options=map.iloc[:, 0].tolist())
+    map = conn.query('select distinct "MAP" from ppmpkm where "MAP" notnull')
+    map = st.multiselect("MAP", options=map.iloc[:, 0].tolist())
 
-        sektor = conn.query(
-            'select distinct "NM_KATEGORI" from ppmpkm where "NM_KATEGORI" notnull'
-        )
-        sektor = st.multiselect("SEKTOR", options=sektor.iloc[:, 0].tolist())
+    sektor = conn.query(
+        'select distinct "NM_KATEGORI" from ppmpkm where "NM_KATEGORI" notnull'
+    )
+    sektor = st.multiselect("SEKTOR", options=sektor.iloc[:, 0].tolist())
 
-        segmen = conn.query(
-            """select distinct "SEGMENTASI_WP" from ppmpkm where "SEGMENTASI_WP" notnull and "SEGMENTASI_WP"!='' """
-        )
-        segmen = st.multiselect("SEGMENTASI", options=segmen.iloc[:, 0].tolist())
+    segmen = conn.query(
+        """select distinct "SEGMENTASI_WP" from ppmpkm where "SEGMENTASI_WP" notnull and "SEGMENTASI_WP"!='' """
+    )
+    segmen = st.multiselect("SEGMENTASI", options=segmen.iloc[:, 0].tolist())
 
-        # wp
-        wp = conn.query(
-            """select distinct "NAMA_WP" from ppmpkm where "NAMA_WP" notnull and "NAMA_WP"!=''
-            """
-        )
-        wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
+    # wp
+    wp = conn.query(
+        """select distinct "NAMA_WP" from ppmpkm where "NAMA_WP" notnull and "NAMA_WP"!=''
+        """
+    )
+    wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
 
     # Main apps-----------------------------------------------------------------------
-
+# access_token, id_token = authenticate.get_user_tokens(st.session_state["auth_code"])
+# st.write(st.session_state)
+if st.session_state["authenticated"]:
     colmain = st.columns([1, 4, 1])
     with colmain[0]:
         st.image("assets/unit.png", width=150)
@@ -211,22 +201,14 @@ elif st.session_state["authentication_status"]:
 
     with colmain[1]:
         st.header("Tax Revenue Monitoring Sistem🚀")
-        st.text(f" Salam Satu Bahu: {name}")
+        # st.text(f" Salam Satu Bahu: {name}")
     with colmain[2]:
-        if st.session_state["authentication_status"]:
-            authenticator.logout("Logout", "main")
-
         if switch:
             with open("style/darkmode.css") as f:
                 st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
             st.session_state["darkmode"] = "on"
         else:
             st.session_state["darkmode"] = "off"
-
-    # st.markdown(
-    #     """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
-    #     unsafe_allow_html=True,
-    # )
 
     # filterdata
     filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
@@ -1086,4 +1068,10 @@ elif st.session_state["authentication_status"]:
     with chart_container(top10kpp):
         st.plotly_chart(cluster_top10kpp, use_container_width=True)
 
-    # target2023
+else:
+    if st.session_state["authenticated"]:
+        st.warning(
+            "Upps, kontak administrator @seksi Data dan Potensi Kanwil DJP Jakarta Timur "
+        )
+    else:
+        st.warning("🚨🚨Silakan Login Duluuu🚨🚨")
