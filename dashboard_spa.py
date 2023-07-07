@@ -19,9 +19,10 @@ from PIL import Image
 import sqlite3
 import string
 import hashlib
+import components.authenticate as authenticate
 
-conn_sqlite = sqlite3.connect("credentials.db")
-c = conn_sqlite.cursor()
+# conn_sqlite = sqlite3.connect("credentials.db")
+# c = conn_sqlite.cursor()
 
 
 st.set_page_config(
@@ -78,57 +79,8 @@ def generate_random_string(char, length):
     return temp
 
 
-def login_user(username, password):
-    c.execute(
-        "SELECT * FROM user WHERE usernameS =? AND password = ?",
-        (username, password),
-    )
-    data = c.fetchall()
-    return data
-
-
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
-
-
-def login_page():
-    image = Image.open("assets/unit.png")
-    if "user" not in st.session_state:
-        st.session_state["user"] = " "
-    with st.form(key="Login", clear_on_submit=True):
-        # st.subheader("👋Login-TRMS👋")
-        st.image(image)
-        user = st.text_input("Masukkan Username")
-        password = st.text_input("Password", type="password")
-        # login = st.button("login", key=unique_key(4))
-        login = st.form_submit_button("Login")
-
-    if login:
-        pass_hashed = make_hashes(password)
-        cek = login_user(user, pass_hashed)
-        length_passs = len(cek)
-        if len(user) == 0 or len(password) == 0:
-            st.warning("🚨Isi Username dan Password 🚨")
-        elif length_passs == 0:
-            st.warning("Akun Tidak Ditemukan🤖")
-        elif cek:
-            st.success("Login Suksess")
-            st.session_state["user"] = {
-                "nama": cek[0][1],
-                "kpp": cek[0][3],
-                "kantor": cek[0][4],
-            }
-    else:
-        st.session_state["user"] = {
-            "nama": "",
-            "kpp": "",
-            "kantor": "",
-        }
-    return [
-        st.session_state["user"]["nama"],
-        st.session_state["user"]["kpp"],
-        st.session_state["user"]["kantor"],
-    ]
 
 
 def unique_key(seed: int):
@@ -237,70 +189,77 @@ def format_number(x):
 if "darkmode" not in st.session_state:
     st.session_state["darkmode"] = "off"
 
+    # name, authentication_status, username = credential()
 
-# name, authentication_status, username = credential()
-nama, kpp, kantor = login_page()
-if nama != "":
-    # Sidebar----------------------------------------------------------------------------
-    # Main apps-----------------------------------------------------------------------
-    tabs = option_menu(
-        None,
-        ["Dashboard", "ALCo", "AskData"],
-        icons=["bi bi-speedometer", "bi bi-bar-chart", "bi bi-messenger"],
-        menu_icon="cast",
-        default_index=0,
-        orientation="horizontal",
-        styles={
-            "container": {
-                "padding": "3!important",
-                "background-color": "#005fac",
-                "max-width": "2560px",
-            },
-            "icon": {"color": "orange", "font-size": "14px"},
-            "nav-link": {
-                "font-size": "14px",
-                "text-align": "left",
-                "margin": "0px",
-                "--hover-color": "#eee",
-            },
-            "nav-link-selected": {"background-color": "#ffc91b"},
-            "menu-title": {"background-color": "#018da2"},
+tabs = option_menu(
+    None,
+    ["Dashboard", "ALCo", "AskData"],
+    icons=["bi bi-speedometer", "bi bi-bar-chart", "bi bi-messenger"],
+    menu_icon="cast",
+    default_index=0,
+    orientation="horizontal",
+    styles={
+        "container": {
+            "padding": "3!important",
+            "background-color": "#005fac",
+            "max-width": "2560px",
         },
-    )
-    if tabs == "Dashboard":
-        colmain = st.columns([1, 4, 1])
-        with colmain[0]:
-            st.image("assets/unit.png", width=150)
-            switch = st_toggle_switch(
-                label="Darkmode",
-                key="switch_1",
-                default_value=False,
-                label_after=False,
-                inactive_color="#D3D3D3",  # optional
-                active_color="#11567f",  # optional
-                track_color="#29B5E8",  # optional
-            )
+        "icon": {"color": "orange", "font-size": "14px"},
+        "nav-link": {
+            "font-size": "14px",
+            "text-align": "left",
+            "margin": "0px",
+            "--hover-color": "#eee",
+        },
+        "nav-link-selected": {"background-color": "#ffc91b"},
+        "menu-title": {"background-color": "#018da2"},
+    },
+)
 
-        with colmain[1]:
-            st.header("Tax Revenue Monitoring Sistem🚀")
-            st.text(f" Salam Satu Bahu: {nama}")
-        with colmain[2]:
-            if nama:
-                keluar = st.button("Logout")
-                if keluar:
-                    del st.session_state["user"]
 
-            if switch:
-                with open("style/darkmode.css") as f:
-                    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-                st.session_state["darkmode"] = "on"
-            else:
-                st.session_state["darkmode"] = "off"
+if tabs == "Dashboard":
+    colmain = st.columns([1, 4, 1])
+    with colmain[0]:
+        st.image("assets/unit.png", width=150)
+        switch = st_toggle_switch(
+            label="Darkmode",
+            key="switch_1",
+            default_value=False,
+            label_after=False,
+            inactive_color="#D3D3D3",  # optional
+            active_color="#11567f",  # optional
+            track_color="#29B5E8",  # optional
+        )
 
-        # st.markdown(
-        #     """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
-        #     unsafe_allow_html=True,
-        # )
+    with colmain[1]:
+        st.header("Tax Revenue Monitoring Sistem🚀")
+
+        # st.text(f" Salam Satu Bahu: {nama}")
+    with colmain[2]:
+        authenticate.set_st_state_vars()
+        if st.session_state["authenticated"]:
+            authenticate.button_logout()
+        else:
+            authenticate.button_login()
+
+        # if nama:
+        # keluar = st.button("Logout")
+        # if keluar:
+        #     del st.session_state["user"]
+
+        if switch:
+            with open("style/darkmode.css") as f:
+                st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+            st.session_state["darkmode"] = "on"
+        else:
+            st.session_state["darkmode"] = "off"
+    if (
+        st.session_state["authenticated"]
+        and "superuser" in st.session_state["user_cognito_groups"]
+    ):
+        access_token, id_token = authenticate.get_user_tokens(
+            st.session_state["auth_code"]
+        )
         col_filter = st.columns([1, 1, 1, 2, 2, 2, 2])
         with col_filter[0]:
             mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
@@ -1514,3 +1473,8 @@ if nama != "":
             tumbuh = ff.create_table(tumbuh_bulanan, colorscale=colorscale)
 
             st.plotly_chart(tumbuh, use_container_width=True)
+else:
+    if st.session_state["authenticated"]:
+        st.write("You do not have access. Please contact the administrator.")
+    else:
+        st.write("Please login!")
