@@ -10,15 +10,19 @@ from dateutil.relativedelta import relativedelta
 from datetime import date
 from datetime import datetime
 import pandas as pd
-from yaml.loader import SafeLoader
-import yaml
-import streamlit_authenticator as stauth
 import streamlit as st
 import random
 from streamlit_toggle import st_toggle_switch
 from streamlit_option_menu import option_menu
 from math import ceil
+from PIL import Image
 import sqlite3
+import string
+import hashlib
+
+conn_sqlite = sqlite3.connect("credentials.db")
+c = conn_sqlite.cursor()
+
 
 st.set_page_config(
     page_title="Tax Revenue Monitoring Sistem",
@@ -26,7 +30,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-from scripts.login import names, usernames
+from scripts.notuse_ogin import names, usernames
 from scripts.db import (
     data_ket,
     target,
@@ -51,10 +55,9 @@ from scripts.db import (
     sankey_subsektor,
     generate_rgba_colors,
 )
+
 from scripts.filter_dataframe import filter_dataframe
 
-conn_sqlite = sqlite3.connect("credentials.db")
-c = conn_sqlite.cursor()
 # settings
 
 with open("style/style.css") as f:
@@ -65,25 +68,67 @@ conn = st.experimental_connection("ppmpkm", type="sql")
 
 
 # Function/module
-def credential():
-    c.execute("select * from user")
-    users = c.fetchall()
-    usernames = [user[0] for user in users]
-    names = [user[1] for user in users]
-    hashed_passwords = [user[2] for user in users]
-    email = " " * len(names)
-    temp = "usernames" * len(names)
-    cred = dict(zip(temp, zip(usernames, zip(email, names, hashed_passwords))))
-    st.write(cred)
-    authenticator = stauth.Authenticate(
-        cred,
-        cookie_name="KilauJaktim@110",
-        key="byGengsu@110",
-        cookie_expiry_days=30,
-    )
+def generate_random_string(char, length):
+    random.seed(10)
+    temp = []
+    for i in range(0, length):
+        letters = string.ascii_lowercase + string.ascii_uppercase + string.digits
+        hmm = "".join(random.choice(letters) for _ in range(char))
+        temp.append(hmm)
+    return temp
 
-    name, authentication_status, username = authenticator.login("👋Login-TRMS👋", "main")
-    return name, authentication_status, username
+
+def login_user(username, password):
+    c.execute(
+        "SELECT * FROM user WHERE usernameS =? AND password = ?",
+        (username, password),
+    )
+    data = c.fetchall()
+    return data
+
+
+def make_hashes(password):
+    return hashlib.sha256(str.encode(password)).hexdigest()
+
+
+def login_page():
+    image = Image.open("assets/unit.png")
+    if "user" not in st.session_state:
+        st.session_state["user"] = " "
+    with st.form(key="Login", clear_on_submit=True):
+        # st.subheader("👋Login-TRMS👋")
+        st.image(image)
+        user = st.text_input("Masukkan Username")
+        password = st.text_input("Password", type="password")
+        # login = st.button("login", key=unique_key(4))
+        login = st.form_submit_button("Login")
+
+    if login:
+        pass_hashed = make_hashes(password)
+        cek = login_user(user, pass_hashed)
+        length_passs = len(cek)
+        if len(user) == 0 or len(password) == 0:
+            st.warning("🚨Isi Username dan Password 🚨")
+        elif length_passs == 0:
+            st.warning("Akun Tidak Ditemukan🤖")
+        elif cek:
+            st.success("Login Suksess")
+            st.session_state["user"] = {
+                "nama": cek[0][1],
+                "kpp": cek[0][3],
+                "kantor": cek[0][4],
+            }
+    else:
+        st.session_state["user"] = {
+            "nama": "",
+            "kpp": "",
+            "kantor": "",
+        }
+    return [
+        st.session_state["user"]["nama"],
+        st.session_state["user"]["kpp"],
+        st.session_state["user"]["kantor"],
+    ]
 
 
 def unique_key(seed: int):
@@ -194,14 +239,8 @@ if "darkmode" not in st.session_state:
 
 
 # name, authentication_status, username = credential()
-cred = credential()
-st.write(cred)
-st.write(authentication_status)
-if st.authentication_status == False:
-    st.error("Username atau Password salah 🫢")
-elif authentication_status == None:
-    st.warning("Masukan username dan password yang sesuai")
-elif authentication_status:
+nama, kpp, kantor = login_page()
+if nama != "":
     # Sidebar----------------------------------------------------------------------------
     # Main apps-----------------------------------------------------------------------
     tabs = option_menu(
@@ -244,10 +283,12 @@ elif authentication_status:
 
         with colmain[1]:
             st.header("Tax Revenue Monitoring Sistem🚀")
-            st.text(f" Salam Satu Bahu: {name}")
+            st.text(f" Salam Satu Bahu: {nama}")
         with colmain[2]:
-            if st.session_state["authentication_status"]:
-                authenticator.logout("Logout", "main")
+            if nama:
+                keluar = st.button("Logout")
+                if keluar:
+                    del st.session_state["user"]
 
             if switch:
                 with open("style/darkmode.css") as f:
