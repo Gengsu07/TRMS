@@ -7,6 +7,16 @@ textColor="#fff"
 #textColor="#f8f8f2"
 
 
+
+#color kemenkeu
+#005FAC
+#ffc91b
+
+#color DJP
+28377a
+ffca19
+
+
 # renpen_realisasi
 renpen_realisasi = conn.query('select * from renpen_realisasi')
 renpen_realisasi = renpen_realisasi.groupby(

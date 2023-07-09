@@ -27,7 +27,7 @@ dict_sektor = {
     "INFORMASI DAN KOMUNIKASI": "INFORMASI DAN KOMUNIKASI",
     "PENGADAAN LISTRIK, GAS, UAP/AIR PANAS DAN UDARA DINGIN": "PENGADAAN LISTRIK, GAS, UAP/AIR PANAS DAN UDARA DINGIN",
     "ADMINISTRASI PEMERINTAHAN, PERTAHANAN DAN JAMINAN SOSIAL WAJIB": "ADMIN. PEMERINTAHAN & JAMINAN SOSIAL",
-    "PERDAGANGAN BESAR DAN ECERAN; REPARASI DAN PERAWATAN MOBIL DAN SEPEDA MOTOR": " PERDAGANGAN BESAR ECERAN & PERAWATAN MOBIL",
+    "PERDAGANGAN BESAR DAN ECERAN; REPARASI DAN PERAWATAN MOBIL DAN SEPEDA MOTOR": "PERDAGANGAN BESAR ECERAN & PERAWATAN MOBIL",
     "AKTIVITAS KEUANGAN DAN ASURANSI": "AKTIVITAS KEUANGAN DAN ASURANSI",
     "KONSTRUKSI": "KONSTRUKSI",
     "AKTIVITAS KESEHATAN MANUSIA DAN AKTIVITAS SOSIAL": "KESEHATAN MANUSIA & AKTIVITAS SOSIAL",
@@ -824,6 +824,7 @@ def subsektor(filter, filter22):
         values="BRUTO",
         aggfunc="sum",
     ).reset_index()
+    data = data.sort_values(by="2023", ascending=False)
     # data["Naik/Turun"] = data["2023"] - data["2022"]
     # data["Tumbuh"] = round((data["Naik/Turun"] / data["2022"]) * 100, 2)
 
@@ -978,12 +979,13 @@ def explore_data(filter_date, filter_date22, filter_cat) -> pd.DataFrame:
         kueri = f"""
         SELECT 
         p."ADMIN" ,p."NAMA_WP" ,p."MAP",p."KDBAYAR" ,p."NM_KATEGORI",p."NM_GOLPOK" ,p."NAMA_KLU" , p."KET" ,
-        p."BULANBAYAR" ,p."TAHUNBAYAR" ,p."DATEBAYAR" ,p."NAMA_AR" ,p."SEKSI" ,p."SEGMENTASI_WP" , 
+        p."BULANBAYAR" ,p."TAHUNBAYAR" ,p."DATEBAYAR" ,p."NAMA_AR" ,p."SEKSI" ,p."SEGMENTASI_WP" 
         ,sum(p."NOMINAL") as "NOMINAL"
         FROM  ppmpkm p 
         where {filter_cat} and({filter_date}) 
         GROUP BY p."ADMIN" ,p."NAMA_WP" ,p."MAP",p."KDBAYAR" ,p."NM_KATEGORI",p."NM_GOLPOK" ,p."NAMA_KLU" , p."KET" ,
         p."BULANBAYAR" ,p."TAHUNBAYAR" ,p."DATEBAYAR" ,p."NAMA_AR" ,p."SEKSI" ,p."SEGMENTASI_WP"
+        ORDER BY sum(p."NOMINAL") desc
         """
     else:
         kueri = f"""
@@ -995,9 +997,23 @@ def explore_data(filter_date, filter_date22, filter_cat) -> pd.DataFrame:
         where ({filter_date}) 
         GROUP BY p."ADMIN" ,p."NAMA_WP" ,p."MAP",p."KDBAYAR" ,p."NM_KATEGORI",p."NM_GOLPOK" ,p."NAMA_KLU" , p."KET" ,
         p."BULANBAYAR" ,p."TAHUNBAYAR" ,p."DATEBAYAR" ,p."NAMA_AR" ,p."SEKSI" ,p."SEGMENTASI_WP"
+        ORDER BY sum(p."NOMINAL") desc
         """
     # data = pl.read_database(query=kueri, connection_uri=conn_uri, engine="adbc")
     data = pd.read_sql(kueri, con=conn_postgres)
+    return data
+
+
+def map_mom(filter):
+    kueri = f"""
+    SELECT 
+    p."MAP" ,p."BULANBAYAR" , sum(p."NOMINAL") AS "NOMINAL" 
+    FROM ppmpkm p 
+    WHERE {filter} and p."KET" in('MPN','SPM')
+    GROUP BY p."MAP" ,p."BULANBAYAR"
+    ORDER BY p."MAP" ,p."BULANBAYAR" ASC 
+"""
+    data = conn.query(kueri)
     return data
 
 

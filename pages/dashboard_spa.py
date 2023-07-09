@@ -51,6 +51,7 @@ from scripts.db import (
     sankey_subsektor,
     generate_rgba_colors,
     explore_data,
+    map_mom,
 )
 from scripts.aggrid import aggrid
 
@@ -232,7 +233,8 @@ if (
         styles={
             "container": {
                 "padding": "3!important",
-                "background-color": "#f0f2f6",
+                "background-color": "#28377a",
+                "color": "#fff",
                 # "border": "2px solid #005FAC",
                 "max-width": "2560px",
             },
@@ -243,13 +245,16 @@ if (
                 "text-align": "left",
                 "margin": "0px",
                 "--hover-color": "#eee",
+                "color": "#fff",
             },
-            "nav-link-selected": {"background-color": "#28377a"},
-            "menu-title": {"background-color": "#018da2"},
+            "nav-link-selected": {"background-color": "#ffca19"},
+            "menu-title": {"background-color": "#fff"},
         },
     )
 
     colmain = st.columns([1, 4, 1])
+    background = "rgba(255, 255, 255, 1.0)"
+    background_alco = "#f2f2f2"
     with colmain[0]:
         st.image("assets/unit.png", width=150)
         switch = st_toggle_switch(
@@ -265,6 +270,8 @@ if (
             with open("style/darkmode.css") as f:
                 st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
             st.session_state["darkmode"] = "on"
+            background = "rgba(0, 0, 0, 0.0)"
+            background_alco = "rgba(0, 0, 0, 0.0)"
         else:
             st.session_state["darkmode"] = "off"
 
@@ -464,6 +471,7 @@ if (
                 text="text",
                 height=380,
                 barmode="group",
+                color_discrete_sequence=["#ffca19", "#02275d"],
                 custom_data=["TAHUNBAYAR"],
             )
 
@@ -483,7 +491,7 @@ if (
                     "ticktext": [calendar.month_name[i] for i in range(1, 13)],
                     # "tickfont": {"color": "#fff"},
                 },
-                paper_bgcolor="rgba(0, 0, 0, 0)",
+                paper_bgcolor=background,
                 plot_bgcolor="rgba(0, 0, 0, 0)",
                 autosize=True,
             )
@@ -496,7 +504,7 @@ if (
                     lambda x: "{:,.2f}%".format(x)
                 ),
                 height=380,
-                color_discrete_sequence=["#ffc91b", "#005FAC"],
+                color_discrete_sequence=["#ffca19", "#02275d"],
                 markers=True,
                 custom_data=[
                     "TAHUNBAYAR",
@@ -519,7 +527,7 @@ if (
                     "ticktext": [calendar.month_name[i] for i in range(1, 13)],
                     # "tickfont": {"color": "#fff"},
                 },
-                paper_bgcolor="rgba(0, 0, 0, 0)",
+                paper_bgcolor=background,
                 plot_bgcolor="rgba(0, 0, 0, 0)",
                 autosize=True,
             )
@@ -559,13 +567,14 @@ if (
             height=860,
             title=dict(
                 text="Sebaran Penerimaan Sektor ke Jenis Pajak",
-                font=dict(color="slategrey", size=26),
+                font=dict(color="#28377a", size=26),
                 x=0.3,
                 y=0.95,
             ),
-            paper_bgcolor="rgba(0, 0, 0, 0)",
-            plot_bgcolor="rgba(0, 0, 0, 0)",
+            paper_bgcolor=background,
+            plot_bgcolor="#ECF9FF",
         )
+        # st.subheader("Sebaran Penerimaan Sektor ke Jenis Pajak")
         with chart_container(data_sankey):
             st.plotly_chart(sankey_chart, use_container_width=True)
 
@@ -583,7 +592,7 @@ if (
                 text=data_sektor["kontrib2023"],
                 texttemplate="%{x:,.2f}M <br> (%{text})",
                 textposition="auto",
-                marker=dict(color="#005FAC"),
+                marker=dict(color="#28377a"),
                 textangle=0,
                 base=0,
             )
@@ -596,7 +605,7 @@ if (
                 text=data_sektor["kontrib2022"],
                 textposition="auto",
                 texttemplate="%{x:,.2f}M<br> (%{text})",
-                marker=dict(color="#ffc91b"),
+                marker=dict(color="#ffca19"),
                 textangle=0,
                 base=0,
             )
@@ -619,39 +628,95 @@ if (
                     color="slategrey",
                 ),
                 legend=dict(font=dict(color="slategray")),
-                paper_bgcolor="rgba(0, 0, 0, 0)",
+                paper_bgcolor=background,
                 plot_bgcolor="rgba(0, 0, 0, 0)",
             )
             sektor_chart = go.Figure(data=sektor_data, layout=sektor_layout)
-
-            # sektor_bar.update_xaxes(visible=False)
-
-            # kontribusi_bar = go.Bar(
-            #     x=data_sektor["kontribusi"],
-            #     y=data_sektor["NM_KATEGORI"],
-            #     name="kontribusi",
-            #     orientation="h",
-            #     text=data_sektor["kontrib_persen"],
-            #     textposition="auto",
-            #     marker=dict(color="#499894"),
-            #     textangle=0,
-            #     base=0,
-            #     showlegend=False,
-            # )
-            # kontrib_layout = go.Layout()
-            # kontribusi_chart = go.Figure(data=kontribusi_bar, layout=kontrib_layout)
-
-            # kontribusi_chart.update_xaxes(visible=False)
             sektor_chart.update_xaxes(showticklabels=True)  # autorange="reversed"
             sektor_chart.update_yaxes(
                 showticklabels=True, griddash="dot", gridcolor="slategrey"
             )  # autorange="reversed"
             with chart_container(data_sektor):
                 st.plotly_chart(sektor_chart, use_container_width=True)
+            # ------------------------------------------------------------------------------------------------------
+            top4_kat = data_sektor.nlargest(4, columns="BRUTO2023")
+            top4_kat = top4_kat["NM_KATEGORI"].tolist()
+
+            sektor_mom = data_sektor_awal[1]
+            sektor_mom = sektor_mom[["NM_KATEGORI", "BULANBAYAR", "BRUTO2023"]]
+            sektor_mom = sektor_mom[sektor_mom["NM_KATEGORI"] != ""]
+            sektor_mom.fillna(0, inplace=True)
+            sektor_mom = (
+                sektor_mom.groupby(["NM_KATEGORI", "BULANBAYAR"]).sum().reset_index()
+            )
+            sektor_mom = sektor_mom.sort_values(
+                by=["NM_KATEGORI", "BULANBAYAR"], ascending=True
+            )
+            sektor_mom["MoM_GROWTH"] = (
+                sektor_mom["BRUTO2023"].pct_change(periods=1)
+            ) * 100
+            sektor_mom_top4 = sektor_mom[sektor_mom["NM_KATEGORI"].isin(top4_kat)]
+            st.subheader("Month Over Month Growth 4 Sektor Terbesar")
+            rows = ceil(len(sektor_mom_top4["NM_KATEGORI"].unique()) / 2)
+            container = {}
+            counter = 1
+            for row in range(1, rows + 1):
+                container[row] = st.container()
+                with container[row]:
+                    cekisi = len(sektor_mom_top4["NM_KATEGORI"].unique())
+                    cek_baris = ceil(cekisi / 2)
+                    sisa4 = cekisi % 2
+                    if row < cek_baris:
+                        col = st.columns(2)
+                    elif sisa4 == 1:
+                        col = st.columns([50, 50])
+                    for x in range(1, 3):
+                        if counter <= len(sektor_mom_top4["NM_KATEGORI"].unique()):
+                            with col[x - 1]:
+                                data_col = sektor_mom_top4[
+                                    sektor_mom_top4["NM_KATEGORI"]
+                                    == top4_kat[counter - 1]
+                                ]
+
+                                data_col["WARNA"] = data_col["MoM_GROWTH"].apply(
+                                    lambda x: "Merah" if x < 0 else "Hijau"
+                                )
+                                mom_chart = px.bar(
+                                    data_col,
+                                    x="MoM_GROWTH",
+                                    y="BULANBAYAR",
+                                    color="WARNA",
+                                    orientation="h",
+                                    text_auto=".2f",
+                                    color_discrete_sequence=["#02275d", "#F96666"],
+                                )
+                                mom_chart.update_layout(
+                                    xaxis=dict(visible=False),
+                                    yaxis=dict(visible=False, autorange="reversed"),
+                                    # yaxis=dict(tickfont=dict(color="#fff")),
+                                    title=dict(
+                                        text=f"{top4_kat[counter-1]}",
+                                        # font=dict(color="#4d5b69"),
+                                        x=0.25,
+                                        y=0.95,
+                                        font=dict(size=14, color="slategrey"),
+                                    ),
+                                    showlegend=False,
+                                    bargap=0.2,
+                                    paper_bgcolor=background,
+                                    plot_bgcolor="rgba(0, 0, 0, 0)",
+                                )
+
+                                st.plotly_chart(mom_chart, use_container_width=True)
+
+                                # st.dataframe(data_col)
+                        counter += 1
+
         except:
             st.subheader("🪂 No Data Available🪂")
-            # data
+        # data
         try:
+            colsek = st.columns(2)
             data_sektor_table = sektor_yoy(filter, filter22, includewp=True)[2]
             data_sektor_table = data_sektor_table[
                 [
@@ -666,51 +731,20 @@ if (
                     "TumbuhBruto",
                 ]
             ]
-
-            with chart_container(data_sektor_table):
-                st.dataframe(
-                    filter_dataframe(data_sektor_table, key=unique_key(5)),
-                    use_container_width=True,
-                    hide_index=True,
-                )
-
-            klu_data = klu(filter)
-            klu = klu_data.copy()
-            klu["BRUTO_M"] = klu["BRUTO"] / 1000000000
-            klu["Kontribusi"] = ((klu["BRUTO"] / klu["BRUTO"].sum()) * 100).apply(
-                lambda x: "{:,.2f}%".format(x)
-            )
-            kluchart = px.treemap(
-                klu,
-                labels="NAMA_KLU",
-                values="BRUTO_M",
-                path=["NAMA_KLU"],
-                color="NM_KATEGORI",
-                color_discrete_sequence=px.colors.qualitative.Safe,
-                height=560,
-                custom_data=["Kontribusi"],
-                title="Proporsi Penerimaan per KLU",
-            )
-            kluchart.update_traces(
-                hovertemplate="<b>%{label}</b>(%{customdata[0]})<br><br>"
-                + "NAMA KLU: %{id}<br>"
-                + "BRUTO: %{value:,.1f}M <extra></extra>"
-            )
-
-            kluchart.update_layout(
-                paper_bgcolor="rgba(0, 0, 0, 0)",
-                plot_bgcolor="rgba(0, 0, 0, 0)",
-                xaxis_title="",
-                yaxis_title="",
-                title=dict(
-                    text="Proporsi Klasifikasi Lapangan Usaha (Bruto)",
-                    font=dict(color="slategrey", size=26),
-                    x=0.5,
-                    y=0.95,
-                ),
-            )
-            with chart_container(klu_data.sort_values(by="BRUTO", ascending=False)):
-                st.plotly_chart(kluchart, use_container_width=True)
+            with colsek[0]:
+                with chart_container(data_sektor_table):
+                    st.dataframe(
+                        filter_dataframe(data_sektor_table, key=unique_key(5)),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with colsek[1]:
+                with chart_container(sektor_mom):
+                    st.dataframe(
+                        filter_dataframe(sektor_mom, key=unique_key(6)),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
 
             st.markdown(
                 """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
@@ -729,7 +763,7 @@ if (
                 text=jenis_pajak9["KONTRIBUSI2023"],
                 texttemplate="%{x:,.1f}M (%{text})%",
                 textposition="outside",
-                marker=dict(color="#005FAC"),  # ffc91b
+                marker=dict(color="#28377a"),  # ffc91b
                 width=0.5,
             )
 
@@ -742,7 +776,7 @@ if (
                 texttemplate="%{x:,.1f}M (%{text}%)",
                 textposition="auto",
                 base=0,
-                marker=dict(color="#ffc91b"),  # ffc91b
+                marker=dict(color="#ffca19"),  # ffc91b
                 width=0.5,
             )
             data_map = [mapbar22, mapbar23]
@@ -765,7 +799,7 @@ if (
                     size=12,
                     color="slategrey",
                 ),
-                paper_bgcolor="rgba(0, 0, 0, 0)",
+                paper_bgcolor=background,
                 plot_bgcolor="rgba(0, 0, 0, 0)",
             )
             mapchart = go.Figure(data=data_map, layout=map_layout)
@@ -773,17 +807,80 @@ if (
             with chart_container(jenis_pajak9):
                 st.plotly_chart(mapchart, use_container_width=True)
 
-            jenis_wp, *_ = jns_pajak(filter, filter22, includewp=True)
-            with chart_container(jenis_wp.reset_index()):
-                # jenis_pajak = jenis_pajak[
-                #     ["NAMA_WP", "MAP", "TAHUNBAYAR", "JENIS_WP","2022", "KONTRIBUSI2022", "2023", "KONTRIBUSI2023", "TUMBUH"]
-                # ]
-                st.dataframe(
-                    filter_dataframe(jenis_wp, key=unique_key(45)),
-                    use_container_width=True,
-                    hide_index=True,
-                )
+            # -----------------------------------------------------------------------------------------
+            top4_map = jenis_pajak9.nlargest(4, columns="BRUTO2023")
+            top4_map = top4_map["MAP"].tolist()
 
+            map_mom = map_mom(filter)
+
+            map_mom = map_mom[map_mom["MAP"] != ""]
+            map_mom.fillna(0, inplace=True)
+            map_mom = map_mom.groupby(["MAP", "BULANBAYAR"]).sum().reset_index()
+            map_mom = map_mom.sort_values(by=["MAP", "BULANBAYAR"], ascending=True)
+            # map_mom["MoM_GROWTH"] = (map_mom["NOMINAL"].pct_change(periods=1)) * 100
+            map_mom_top4 = map_mom[map_mom["MAP"].isin(top4_map)]
+
+            st.subheader("Month Over Month Growth 4 Jenis Pajak Terbesar")
+
+            rows = ceil(len(map_mom_top4["MAP"].unique()) / 2)
+            container = {}
+            counter = 1
+            for row in range(1, rows + 1):
+                container[row] = st.container()
+                with container[row]:
+                    cekisi = len(map_mom_top4["MAP"].unique())
+                    cek_baris = ceil(cekisi / 2)
+                    sisa4 = cekisi % 2
+                    if row < cek_baris:
+                        col = st.columns(2)
+                    elif sisa4 == 1:
+                        col = st.columns([50, 50])
+                    for x in range(1, 3):
+                        if counter <= len(map_mom_top4["MAP"].unique()):
+                            with col[x - 1]:
+                                data_col = map_mom_top4[
+                                    map_mom_top4["MAP"] == top4_map[counter - 1]
+                                ]
+                                # st.write(counter)
+                                # st.write(top4_map[counter - 1])
+
+                                data_col["MoM_GROWTH"] = (
+                                    data_col["NOMINAL"].pct_change(periods=1)
+                                ) * 100
+                                data_col["WARNA"] = data_col["MoM_GROWTH"].apply(
+                                    lambda x: "Merah" if x < 0 else "Hijau"
+                                )
+                                mom_chart = px.bar(
+                                    data_col,
+                                    x="MoM_GROWTH",
+                                    y="BULANBAYAR",
+                                    color="WARNA",
+                                    orientation="h",
+                                    text_auto=".2f",
+                                    color_discrete_sequence=["#02275d", "#F96666"],
+                                )
+                                mom_chart.update_layout(
+                                    xaxis=dict(visible=False),
+                                    yaxis=dict(visible=False, autorange="reversed"),
+                                    # yaxis=dict(tickfont=dict(color="#fff")),
+                                    title=dict(
+                                        text=f"{top4_map[counter - 1]}",
+                                        # font=dict(color="#4d5b69"),
+                                        x=0.25,
+                                        y=0.95,
+                                        font=dict(size=14, color="slategrey"),
+                                    ),
+                                    showlegend=False,
+                                    bargap=0.2,
+                                    paper_bgcolor=background,
+                                    plot_bgcolor="rgba(0, 0, 0, 0)",
+                                )
+
+                                st.plotly_chart(mom_chart, use_container_width=True)
+
+                        counter += 1
+
+            # --------------------------------------------------------------------------------------------------------
             kjs = kjs(filter)
             kjs["BRUTO_M"] = kjs["BRUTO"] / 1000000000
             kjs["Kontribusi"] = (kjs["BRUTO"] / kjs["BRUTO"].sum()) * 100
@@ -807,7 +904,7 @@ if (
             kjschart.update_traces(hovertemplate=hovertemplate)
 
             kjschart.update_layout(
-                paper_bgcolor="rgba(0, 0, 0, 0)",
+                paper_bgcolor=background,
                 plot_bgcolor="rgba(0, 0, 0, 0)",
                 xaxis_title="",
                 yaxis_title="",
@@ -819,6 +916,17 @@ if (
             )
             with chart_container(kjs):
                 st.plotly_chart(kjschart, use_container_width=True)
+
+            jenis_wp, *_ = jns_pajak(filter, filter22, includewp=True)
+            with chart_container(jenis_wp.reset_index()):
+                # jenis_pajak = jenis_pajak[
+                #     ["NAMA_WP", "MAP", "TAHUNBAYAR", "JENIS_WP","2022", "KONTRIBUSI2022", "2023", "KONTRIBUSI2023", "TUMBUH"]
+                # ]
+                st.dataframe(
+                    filter_dataframe(jenis_wp, key=unique_key(45)),
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
             st.markdown(
                 """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
@@ -898,7 +1006,7 @@ if (
                                 y=0.95,
                                 font=dict(size=26, color="slategrey"),
                             ),
-                            paper_bgcolor="rgba(0, 0, 0, 0)",
+                            paper_bgcolor=background,
                             plot_bgcolor="rgba(0, 0, 0, 0)",
                         )
                         st.plotly_chart(proporsi_chart, use_container_width=True)
@@ -1265,7 +1373,7 @@ if (
                                 yaxis={"visible": False, "showticklabels": False},
                                 xaxis={"visible": False, "showticklabels": False},
                                 margin=dict(l=0, r=0, t=0, b=0),
-                                paper_bgcolor="rgba(0, 0, 0, 0)",
+                                paper_bgcolor=background_alco,
                                 plot_bgcolor="rgba(0, 0, 0, 0)",
                                 autosize=True,
                                 showlegend=False,
@@ -1289,7 +1397,7 @@ if (
         for row in range(1, rows + 1):
             container[row] = st.container()
             with container[row]:
-                cekisi = len(sektor_plus)
+                cekisi = len(sektor_min)
                 cek_baris = ceil(cekisi / 4)
                 sisa4 = cekisi % 4
                 if row < cek_baris:
@@ -1335,7 +1443,7 @@ if (
                                 yaxis={"visible": False},
                                 xaxis={"visible": False},
                                 margin=dict(l=0, r=0, t=0, b=0),
-                                paper_bgcolor="rgba(0, 0, 0, 0)",
+                                paper_bgcolor=background_alco,
                                 plot_bgcolor="rgba(0, 0, 0, 0)",
                                 autosize=True,
                                 showlegend=False,
@@ -1361,23 +1469,17 @@ if (
 
         with chart_container(data_subsektor):
             nama_sektor = data_subsektor["NM_KATEGORI"].unique().tolist()
-            tab_subsekstor = st.selectbox("Pilih Sektor:", nama_sektor)
-            if tab_subsekstor:
-                subsektor_df = data_subsektor[
-                    data_subsektor["NM_KATEGORI"] == tab_subsekstor
-                ]
-            else:
-                subsektor_df = data_subsektor.copy()
+            tab_subsekstor = st.selectbox("Pilih Sektor:", nama_sektor, 0)
+            # if tab_subsekstor:
+            subsektor_df = data_subsektor[
+                data_subsektor["NM_KATEGORI"] == tab_subsekstor
+            ]
 
             node_subsektor, sankey_subsektor = sankey_subsektor(
                 subsektor_df, tab_subsekstor
             )
-
             sankey_subsektor.drop(columns="NAMA_KLU", inplace=True)
             sankey_subsektor = sankey_subsektor[sankey_subsektor["NM_KATEGORI"] != ""]
-            # sankey_subsektor = (
-            #     sankey_subsektor.groupby(["NM_KATEGORI", "Sub Sektor"]).sum().reset_index()
-            # )
 
             sankey_subsektor_chart = go.Figure(
                 data=[
@@ -1410,8 +1512,52 @@ if (
                 paper_bgcolor="rgba(0, 0, 0, 0)",
                 plot_bgcolor="rgba(0, 0, 0, 0)",
             )
-            with chart_container(subsektor_df):
-                st.plotly_chart(sankey_subsektor_chart, use_container_width=True)
+
+            st.plotly_chart(sankey_subsektor_chart, use_container_width=True)
+            # else:
+            # subsektor_df = data_subsektor.copy()
+
+            # node_subsektor, sankey_subsektor = sankey_subsektor(
+            #     subsektor_df, tab_subsekstor
+            # )
+
+            # klu_data = klu(filter)
+            klu = subsektor_df.copy()
+            klu["BRUTO_M"] = klu["2023"] / 1000000000
+            klu["Kontribusi"] = ((klu["2023"] / klu["2023"].sum()) * 100).apply(
+                lambda x: "{:,.2f}%".format(x)
+            )
+            kluchart = px.treemap(
+                klu,
+                labels="NAMA_KLU",
+                values="BRUTO_M",
+                path=["NAMA_KLU"],
+                color="NM_KATEGORI",
+                color_discrete_sequence=px.colors.qualitative.Safe,
+                height=560,
+                custom_data=["Kontribusi"],
+                title="Proporsi Penerimaan per KLU",
+            )
+            kluchart.update_traces(
+                hovertemplate="<b>%{label}</b>(%{customdata[0]})<br><br>"
+                + "NAMA KLU: %{id}<br>"
+                + "BRUTO: %{value:,.1f}M <extra></extra>"
+            )
+
+            kluchart.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                title=dict(
+                    # text="Proporsi Klasifikasi Lapangan Usaha (Bruto)",
+                    font=dict(color="slategrey", size=26),
+                    x=0.5,
+                    y=0.95,
+                ),
+            )
+            with chart_container(subsektor_df.sort_values(by="2023", ascending=False)):
+                st.plotly_chart(kluchart, use_container_width=True)
 
             subsektor_table = subsektor_df.drop(columns=["NM_KATEGORI", "NAMA_KLU"])
             subsektor_table = subsektor_table.groupby("Sub Sektor").sum().reset_index()
@@ -1471,8 +1617,11 @@ if (
 
         # cek_ = set(kolom_selected)
         # listkolom = ",".join(['"' + x + '"' for x in kolom_selected])
-
+        st.warning(
+            "Silakan Filter Data Sedetail Mungkin, hanya data yang dibutuhkan saja agar hemat memori🚨"
+        )
         if st.checkbox("Tampilkan Sample Data?"):
+            st.success("Filter dan Pivot Data di sebelelah Kanan")
             df_explore = explore_data(filter_date, filter_date22, filter_cat)
 
             # filtered_df = filter_dataframe(df_explore, key=unique_key(34))
@@ -1480,44 +1629,8 @@ if (
 
             # df_explore.drop(columns=duplicate_cols, inplace=True)
 
-            # aggrid(df_explore)
-            gb = GridOptionsBuilder.from_dataframe(df_explore)
-            gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=20)
-            gb.configure_side_bar()
-            gb.configure_default_column(
-                groupable=True,
-                value=True,
-                enableRowGroup=True,
-                aggFunc="sum",
-                editable=True,
-            )
-            k_sep_formatter = st_ag.JsCode
-            (
-                """function(params) {
-                return (params.value == null) ? params.value : params.value.toLocaleString();
-            }"""
-            )
-            gb.configure_columns(["NOMINAL", "sum"], valueFormatter=k_sep_formatter)
-            # gb.configure_column(
-            #     "NOMINAL",
-            #     type=["numericColumn", "numberColumnFilter", "customNumericFormat"],
-            #     valueFormatter="data.col2.toLocaleString('en-US');",
-            # )
-            # gb.configure_column(
-            #     "sum(NOMINAL)",
-            #     type=["numericColumn", "numberColumnFilter", "customNumericFormat"],
-            #     valueFormatter="data.col2.toLocaleString('en-US');",
-            # )
-            gridOptions = gb.build()
-
-            df_explore_df = AgGrid(
-                df_explore,
-                gridOptions=gridOptions,
-                fit_columns_on_grid_load=True,
-                reload_data=True,
-                editable=True,
-                allow_unsafe_jscode=True,
-            )
+            aggrid(df_explore)
+            st.success("Export Data -> Klik Kanan Data -> Export")
 
             st.subheader("Buat Chart Self Service")
 

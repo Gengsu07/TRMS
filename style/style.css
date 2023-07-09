@@ -1,3 +1,6 @@
+[data-testid="stAppViewContainer"] {
+  background-color: #f2f2f2;
+}
 .css-18ni7ap {
   visibility: hidden;
 }
@@ -48,7 +51,13 @@ div.css-zt5igj.eqr7zpz3 {
   align-items: center;
   text-align: center;
 }
-
+.css-12w0qpk {
+  border: 1px solid #2c5a7b;
+  padding: 0.1rem 0.3rem 0.1rem 0.3rem;
+  box-shadow: 0 0 3px #2c5a7b;
+  border-radius: 3px;
+  margin-top: 1rem;
+}
 [data-testid="stVerticalBlock"] {
   padding-top: 0rem;
   padding-right: 0rem;
@@ -58,7 +67,7 @@ div.css-zt5igj.eqr7zpz3 {
 }
 
 .stAlert {
-  margin: 0rem 10rem;
+  margin: 0rem 0rem;
 }
 
 .css-18e3th9 {
