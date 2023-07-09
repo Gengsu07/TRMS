@@ -1,5 +1,31 @@
+.css-18ni7ap {
+  visibility: hidden;
+}
+.css-1l269bu {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.floating-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #ffc91b;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 10%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  z-index: 999;
+  cursor: pointer;
+}
+.css-5rimss a {
+  color: white;
+  font-size: large;
+  font-weight: bold;
+  text-decoration: none;
+}
 .css-7ym5gk {
-  background-color: #005fac;
+  background-color: #28377a;
 }
 
 [data-testid="stForm"] {
@@ -9,7 +35,7 @@
   justify-content: center;
 }
 [data-testid="stText"] {
-  color: #005fac;
+  color: #28377a;
 }
 /* [data-testid="stAppViewContainer"] {
   background-color: #f4f7f5;
@@ -136,12 +162,12 @@ footer {
 }
 .css-81oif8,
 .css-ue6h4q {
-  background-color: #005fac;
+  background-color: #28377a;
   color: white;
   padding-left: 1rem;
 }
 .css-81oif8.e1oyb3mv3 {
-  background-color: #005fac;
+  background-color: #28377a;
   color: white;
 }
 
@@ -152,7 +178,7 @@ div.st-di {
   color: white;
 }
 div.stCheckbox {
-  background-color: #005fac;
+  background-color: #28377a;
 }
 
 .css-1vbkxwb {

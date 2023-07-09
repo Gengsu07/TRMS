@@ -7,4 +7,5 @@ streamlit-authenticator
 plotly
 entrypoints
 streamlit-option-menu
-duckdb
+pygwalker
+streamlit-aggrid

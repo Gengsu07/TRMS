@@ -209,7 +209,7 @@ logout_link = f"{COGNITO_DOMAIN}/logout?client_id={CLIENT_ID}&logout_uri={APP_UR
 html_css_login = """
 <style>
 .button-login {
-  background-color: skyblue;
+  background-color: #28377a;
   color: white !important;
   padding: 1em 1.5em;
   text-decoration: none;

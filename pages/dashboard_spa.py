@@ -1,6 +1,5 @@
 import plotly.figure_factory as ff
 from streamlit_extras.metric_cards import style_metric_cards
-from streamlit_extras.app_logo import add_logo
 from streamlit_extras.chart_container import chart_container
 import calendar
 from plotly.subplots import make_subplots
@@ -15,14 +14,13 @@ import random
 from streamlit_toggle import st_toggle_switch
 from streamlit_option_menu import option_menu
 from math import ceil
-from PIL import Image
-import sqlite3
 import string
-import hashlib
 import components.authenticate as authenticate
-
-# conn_sqlite = sqlite3.connect("credentials.db")
-# c = conn_sqlite.cursor()
+import pygwalker as pyg
+import streamlit.components.v1 as components
+import st_aggrid as st_ag
+from st_aggrid import AgGrid
+from st_aggrid.grid_options_builder import GridOptionsBuilder
 
 
 st.set_page_config(
@@ -31,7 +29,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-from scripts.notuse_ogin import names, usernames
 from scripts.db import (
     data_ket,
     target,
@@ -48,14 +45,14 @@ from scripts.db import (
     data_sankey,
     generate_rgba_colors,
     top10kpp,
-)
-from scripts.db import (
     sektor_yoy,
     growth_month,
     subsektor,
     sankey_subsektor,
     generate_rgba_colors,
+    explore_data,
 )
+from scripts.aggrid import aggrid
 
 from scripts.filter_dataframe import filter_dataframe
 
@@ -66,6 +63,12 @@ with open("style/style.css") as f:
 
 
 conn = st.experimental_connection("ppmpkm", type="sql")
+st.markdown(
+    """
+    <a href="#tax-revenue-monitoring-sistem" onclick="document.getElementById('cek').scrollIntoView(); return false;" class="floating-button">Filter Data</a>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # Function/module
@@ -77,10 +80,6 @@ def generate_random_string(char, length):
         hmm = "".join(random.choice(letters) for _ in range(char))
         temp.append(hmm)
     return temp
-
-
-def make_hashes(password):
-    return hashlib.sha256(str.encode(password)).hexdigest()
 
 
 def unique_key(seed: int):
@@ -145,6 +144,39 @@ def cek_filter(start, end, kpp, map, sektor, segmen, wp):
     return [filter_gabungan, filter_gabungan22]
 
 
+def filter_ui():
+    col_filter = st.columns([1, 1, 1, 2, 2, 2, 2])
+    with col_filter[0]:
+        mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
+        start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
+    with col_filter[1]:
+        end = st.date_input("Tgl Akhir", max_value=date.today())
+    with col_filter[2]:
+        kpp = conn.query('select distinct "ADMIN" from ppmpkm where "ADMIN" notnull')
+        kpp = st.multiselect("KPP", options=kpp.iloc[:, 0].tolist())
+    with col_filter[3]:
+        map = conn.query('select distinct "MAP" from ppmpkm where "MAP" notnull')
+        map = st.multiselect("MAP", options=map.iloc[:, 0].tolist())
+    with col_filter[4]:
+        sektor = conn.query(
+            'select distinct "NM_KATEGORI" from ppmpkm where "NM_KATEGORI" notnull'
+        )
+        sektor = st.multiselect("SEKTOR", options=sektor.iloc[:, 0].tolist())
+    with col_filter[5]:
+        segmen = conn.query(
+            """select distinct "SEGMENTASI_WP" from ppmpkm where "SEGMENTASI_WP" notnull and "SEGMENTASI_WP"!='' """
+        )
+        segmen = st.multiselect("SEGMENTASI", options=segmen.iloc[:, 0].tolist())
+    with col_filter[6]:
+        # wp
+        wp = conn.query(
+            """select distinct "NAMA_WP" from ppmpkm where "NAMA_WP" notnull and "NAMA_WP"!=''
+                    """
+        )
+        wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
+    return [start, end, kpp, map, sektor, segmen, wp]
+
+
 def tumbuh_zerodev(x, y):
     if y:
         tumbuh_bruto = (x - y) / y
@@ -178,46 +210,45 @@ def format_number(x):
     return number
 
 
-# ---AUTHENTICATION-------------------------------------------------------
-# with open(".streamlit/login.yaml") as file:
-#     config = yaml.load(file, Loader=SafeLoader)
-
-# names = names()
-# usernames = usernames()
-# names = passw.names()
-# usernames = passw.usernames()
 if "darkmode" not in st.session_state:
     st.session_state["darkmode"] = "off"
 
-    # name, authentication_status, username = credential()
 
-tabs = option_menu(
-    None,
-    ["Dashboard", "ALCo", "AskData"],
-    icons=["bi bi-speedometer", "bi bi-bar-chart", "bi bi-messenger"],
-    menu_icon="cast",
-    default_index=0,
-    orientation="horizontal",
-    styles={
-        "container": {
-            "padding": "3!important",
-            "background-color": "#005fac",
-            "max-width": "2560px",
+if (
+    st.session_state["authenticated"]
+    and "superuser" in st.session_state["user_cognito_groups"]
+):
+    # auth_code = str(st.session_state["auth_code"])
+    # access_token, id_token = authenticate.get_user_tokens(auth_code)
+    # user_info = authenticate.get_user_info(access_token)
+    # st.write(st.session_state["user_cognito_groups"])
+    tabs = option_menu(
+        None,
+        ["Dashboard", "ALCo", "SelfAnalytics"],
+        icons=["bi bi-speedometer", "bi bi-bar-chart", "bi bi-messenger"],
+        menu_icon="cast",
+        default_index=0,
+        orientation="horizontal",
+        styles={
+            "container": {
+                "padding": "3!important",
+                "background-color": "#f0f2f6",
+                # "border": "2px solid #005FAC",
+                "max-width": "2560px",
+            },
+            "separator": {"color": "#005FAC"},
+            "icon": {"color": "orange", "font-size": "16"},
+            "nav-link": {
+                "font-size": "16px",
+                "text-align": "left",
+                "margin": "0px",
+                "--hover-color": "#eee",
+            },
+            "nav-link-selected": {"background-color": "#28377a"},
+            "menu-title": {"background-color": "#018da2"},
         },
-        "icon": {"color": "orange", "font-size": "14px"},
-        "nav-link": {
-            "font-size": "14px",
-            "text-align": "left",
-            "margin": "0px",
-            "--hover-color": "#eee",
-        },
-        "nav-link-selected": {"background-color": "#ffc91b"},
-        "menu-title": {"background-color": "#018da2"},
-    },
-)
+    )
 
-
-if tabs == "Dashboard":
     colmain = st.columns([1, 4, 1])
     with colmain[0]:
         st.image("assets/unit.png", width=150)
@@ -230,68 +261,28 @@ if tabs == "Dashboard":
             active_color="#11567f",  # optional
             track_color="#29B5E8",  # optional
         )
-
-    with colmain[1]:
-        st.header("Tax Revenue Monitoring Sistem🚀")
-
-        # st.text(f" Salam Satu Bahu: {nama}")
-    with colmain[2]:
-        authenticate.set_st_state_vars()
-        if st.session_state["authenticated"]:
-            authenticate.button_logout()
-        else:
-            authenticate.button_login()
-
-        # if nama:
-        # keluar = st.button("Logout")
-        # if keluar:
-        #     del st.session_state["user"]
-
         if switch:
             with open("style/darkmode.css") as f:
                 st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
             st.session_state["darkmode"] = "on"
         else:
             st.session_state["darkmode"] = "off"
-    if (
-        st.session_state["authenticated"]
-        and "superuser" in st.session_state["user_cognito_groups"]
-    ):
-        access_token, id_token = authenticate.get_user_tokens(
-            st.session_state["auth_code"]
-        )
-        col_filter = st.columns([1, 1, 1, 2, 2, 2, 2])
-        with col_filter[0]:
-            mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
-            start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
-        with col_filter[1]:
-            end = st.date_input("Tgl Akhir", max_value=date.today())
-        with col_filter[2]:
-            kpp = conn.query(
-                'select distinct "ADMIN" from ppmpkm where "ADMIN" notnull'
-            )
-            kpp = st.multiselect("KPP", options=kpp.iloc[:, 0].tolist())
-        with col_filter[3]:
-            map = conn.query('select distinct "MAP" from ppmpkm where "MAP" notnull')
-            map = st.multiselect("MAP", options=map.iloc[:, 0].tolist())
-        with col_filter[4]:
-            sektor = conn.query(
-                'select distinct "NM_KATEGORI" from ppmpkm where "NM_KATEGORI" notnull'
-            )
-            sektor = st.multiselect("SEKTOR", options=sektor.iloc[:, 0].tolist())
-        with col_filter[5]:
-            segmen = conn.query(
-                """select distinct "SEGMENTASI_WP" from ppmpkm where "SEGMENTASI_WP" notnull and "SEGMENTASI_WP"!='' """
-            )
-            segmen = st.multiselect("SEGMENTASI", options=segmen.iloc[:, 0].tolist())
-        with col_filter[6]:
-            # wp
-            wp = conn.query(
-                """select distinct "NAMA_WP" from ppmpkm where "NAMA_WP" notnull and "NAMA_WP"!=''
-                    """
-            )
-            wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
 
+    with colmain[1]:
+        st.title("Tax Revenue Monitoring Sistem🚀")
+
+        # st.text(f" Salam Satu Bahu: {nama}")
+    with colmain[2]:
+        if st.session_state["authenticated"]:
+            authenticate.button_logout()
+        else:
+            authenticate.button_login()
+        #         access_token, id_token = authenticate.get_user_tokens(
+        #             st.session_state["auth_code"]
+        #         )
+        # st.write(st.session_state["authenticated"])
+    if tabs == "Dashboard":
+        start, end, kpp, map, sektor, segmen, wp = filter_ui()
         # filterdata
         filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
         filter = "and".join(x for x in filter_gabungan[0])
@@ -303,9 +294,10 @@ if tabs == "Dashboard":
         # KPI-----------------------------------------------------------------------------------
         style_metric_cards(
             background_color="#FFFFFF",
-            border_color="#005FAC",
-            border_left_color="#005FAC",
+            border_color="#28377a",
+            border_left_color="#28377a",
         )
+
         data_kpi = kpi(filter, filter22, filter_date, filter_date22)
         data23, data22 = data_kpi
         col_tahun = st.columns(5)
@@ -373,6 +365,7 @@ if tabs == "Dashboard":
                 "{:.2f}%".format(persentase23 * 100),
                 delta="{:.2f}%".format(tumbuh_persen * 100),
             )
+
         # KET-----------------------------------------------------------------------
         ket = data_ket(filter, filter22).set_index("KET")
 
@@ -723,6 +716,7 @@ if tabs == "Dashboard":
                 """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
                 unsafe_allow_html=True,
             )
+
             # JENIS PAJAK----------------------------------------------------------------------------------------
             jenis_pajak, jenis_pajak9 = jns_pajak(filter, filter22, includewp=False)
 
@@ -1042,6 +1036,7 @@ if tabs == "Dashboard":
                         st.plotly_chart(table_bot, use_container_width=True)
         except:
             st.subheader("🪂 No Data Available🪂")
+
             # CLUSTER KPP ------------------------------------------------------------------------------------
         try:
             capaian = cluster(filter, filter22, kpp)
@@ -1075,10 +1070,16 @@ if tabs == "Dashboard":
                 hovertemplate=hovertemplate,
             )
             cluster_chart.add_hline(
-                y=avg_tumbuh, line_dash="dash", line_color="red", name="Rata2 Tumbuh"
+                y=avg_tumbuh,
+                line_dash="dash",
+                line_color="red",
+                name="Rata2 Tumbuh",
             )
             cluster_chart.add_vline(
-                x=avg_capaian, line_dash="dash", line_color="red", name="Rata2 Capaian"
+                x=avg_capaian,
+                line_dash="dash",
+                line_color="red",
+                name="Rata2 Capaian",
             )
             cluster_chart.add_trace(
                 go.Scatter(
@@ -1104,105 +1105,74 @@ if tabs == "Dashboard":
         except:
             st.subheader("🪂 No Data Available🪂")
 
-        top10kpp = top10kpp(filter_date, filter_date22, filter_cat)
-        top10kpp = top10kpp[~top10kpp["ADMIN"].isin(["007", "097"])]
-        avg_realisasi = top10kpp["CY"].mean()
-        avg_tumbuh_kpp = top10kpp["TUMBUH"].mean()
-        cluster_top10kpp = px.scatter(
-            top10kpp,
-            x="CY",
-            y="TUMBUH",
-            # text="NAMA_WP",
-            color="ADMIN",
-            color_continuous_scale=px.colors.diverging.RdBu,
-            custom_data=["NAMA_WP", "PY"],
-        )
-        hovertemplate = (
-            "<b>%{customdata[0]}</b><br><br>"
-            + "Current Year: %{x:,.0f} <br>"
-            + "Prior Year: %{customdata[1]:,.0f}<br>"
-            + "Tumbuh: %{y:,.2f}persen <extra></extra>"
-        )
-        cluster_top10kpp.update_traces(
-            marker=dict(size=10),
-            textposition="bottom center",
-            textfont=dict(color="#F86F03", size=14),
-            hovertemplate=hovertemplate,
-        )
-        cluster_top10kpp.add_hline(
-            y=avg_tumbuh_kpp, line_dash="dash", line_color="red", name="Rata2 Tumbuh"
-        )
-        cluster_top10kpp.add_vline(
-            x=avg_realisasi, line_dash="dash", line_color="red", name="Rata2 Capaian"
-        )
-        cluster_top10kpp.add_trace(
-            go.Scatter(
-                x=[avg_realisasi],
-                y=[avg_tumbuh_kpp],
-                mode="markers",
-                marker=dict(color="green", symbol="x", size=20),
-                name="Rata-rata",
+        try:
+            top10kpp = top10kpp(filter_date, filter_date22, filter_cat)
+            top10kpp = top10kpp[~top10kpp["ADMIN"].isin(["007", "097"])]
+            avg_realisasi = top10kpp["CY"].mean()
+            avg_tumbuh_kpp = top10kpp["TUMBUH"].mean()
+            cluster_top10kpp = px.scatter(
+                top10kpp,
+                x="CY",
+                y="TUMBUH",
+                # text="NAMA_WP",
+                color="ADMIN",
+                color_continuous_scale=px.colors.diverging.RdBu,
+                custom_data=["NAMA_WP", "PY"],
             )
-        )
-        cluster_top10kpp.update_layout(
-            title=dict(
-                text="Clustering 10 WP Besar per KPP Pratama(Bruto)",
-                font=dict(color="slategrey", size=26),
-                x=0.3,
-                y=0.95,
-            ),
-            xaxis={"visible": False},
-            yaxis={"visible": False},
-            # paper_bgcolor="#F6FFF8",
-            plot_bgcolor="rgba(0, 0, 0, 0)",
-        )
+            hovertemplate = (
+                "<b>%{customdata[0]}</b><br><br>"
+                + "Current Year: %{x:,.0f} <br>"
+                + "Prior Year: %{customdata[1]:,.0f}<br>"
+                + "Tumbuh: %{y:,.2f}persen <extra></extra>"
+            )
+            cluster_top10kpp.update_traces(
+                marker=dict(size=10),
+                textposition="bottom center",
+                textfont=dict(color="#F86F03", size=14),
+                hovertemplate=hovertemplate,
+            )
+            cluster_top10kpp.add_hline(
+                y=avg_tumbuh_kpp,
+                line_dash="dash",
+                line_color="red",
+                name="Rata2 Tumbuh",
+            )
+            cluster_top10kpp.add_vline(
+                x=avg_realisasi,
+                line_dash="dash",
+                line_color="red",
+                name="Rata2 Capaian",
+            )
+            cluster_top10kpp.add_trace(
+                go.Scatter(
+                    x=[avg_realisasi],
+                    y=[avg_tumbuh_kpp],
+                    mode="markers",
+                    marker=dict(color="green", symbol="x", size=20),
+                    name="Rata-rata",
+                )
+            )
+            cluster_top10kpp.update_layout(
+                title=dict(
+                    text="Clustering 10 WP Besar per KPP Pratama(Bruto)",
+                    font=dict(color="slategrey", size=26),
+                    x=0.3,
+                    y=0.95,
+                ),
+                xaxis={"visible": False},
+                yaxis={"visible": False},
+                # paper_bgcolor="#F6FFF8",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+            )
 
-        with chart_container(top10kpp):
-            st.plotly_chart(cluster_top10kpp, use_container_width=True)
+            with chart_container(top10kpp):
+                st.plotly_chart(cluster_top10kpp, use_container_width=True)
+        except:
+            st.subheader("🪂 No Data Available🪂")
 
-    # ALCO=============================================================================================================================
+        # ALCO=============================================================================================================================
     elif tabs == "ALCo":
-        colmain = st.columns([1, 4, 1])
-        with colmain[0]:
-            st.image("assets/unit.png", width=150)
-        with colmain[1]:
-            st.header("Tax Revenue Monitoring Sistem🚀")
-            name = st.session_state["name"]
-            st.text(f" Salam Satu Bahu: {name}")
-        with colmain[2]:
-            st.image("assets/unit.png", width=150)
-
-        col_filter = st.columns([1, 1, 1, 2, 2, 2, 2])
-        with col_filter[0]:
-            mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
-            start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
-        with col_filter[1]:
-            end = st.date_input("Tgl Akhir", max_value=date.today())
-        with col_filter[2]:
-            kpp = conn.query(
-                'select distinct "ADMIN" from ppmpkm where "ADMIN" notnull'
-            )
-            kpp = st.multiselect("KPP", options=kpp.iloc[:, 0].tolist())
-        with col_filter[3]:
-            map = conn.query('select distinct "MAP" from ppmpkm where "MAP" notnull')
-            map = st.multiselect("MAP", options=map.iloc[:, 0].tolist())
-        with col_filter[4]:
-            sektor = conn.query(
-                'select distinct "NM_KATEGORI" from ppmpkm where "NM_KATEGORI" notnull'
-            )
-            sektor = st.multiselect("SEKTOR", options=sektor.iloc[:, 0].tolist())
-        with col_filter[5]:
-            segmen = conn.query(
-                """select distinct "SEGMENTASI_WP" from ppmpkm where "SEGMENTASI_WP" notnull and "SEGMENTASI_WP"!='' """
-            )
-            segmen = st.multiselect("SEGMENTASI", options=segmen.iloc[:, 0].tolist())
-        with col_filter[6]:
-            # wp
-            wp = conn.query(
-                """select distinct "NAMA_WP" from ppmpkm where "NAMA_WP" notnull and "NAMA_WP"!=''
-                    """
-            )
-            wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
+        start, end, kpp, map, sektor, segmen, wp = filter_ui()
 
         # filterdata
         filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
@@ -1215,7 +1185,13 @@ if tabs == "Dashboard":
         )
         urutan = st.selectbox(
             "Urut Berdasarkan:",
-            options=["BRUTO2023", "BRUTO2022", "NETTO2023", "NETTO2022", "TumbuhBruto"],
+            options=[
+                "BRUTO2023",
+                "BRUTO2022",
+                "NETTO2023",
+                "NETTO2022",
+                "TumbuhBruto",
+            ],
         )
         # SEKTORRRR CARD
         sektor = sektor_yoy(filter, filter22, includewp=False)
@@ -1456,6 +1432,7 @@ if tabs == "Dashboard":
 
             st.dataframe(subsektor_table, use_container_width=True, hide_index=True)
             st.dataframe(klu_df, use_container_width=True, hide_index=True)
+
         # TUMBUH BULANAN-----------------------------------------------------------------------
         st.subheader("💡 Pertumbuhan Bulanan")
         tumbuh_bulanan = growth_month(filter, filter22)
@@ -1473,8 +1450,89 @@ if tabs == "Dashboard":
             tumbuh = ff.create_table(tumbuh_bulanan, colorscale=colorscale)
 
             st.plotly_chart(tumbuh, use_container_width=True)
+
+    elif tabs == "SelfAnalytics":
+        st.subheader("Self Service Explore, Analisa, dan Membuat Chart Mandiri")
+        start, end, kpp, map, sektor, segmen, wp = filter_ui()
+        # filterdata
+        filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
+        # filter = "and".join(x for x in filter_gabungan[0])
+        filter_date = "and".join(x for x in filter_gabungan[0][:2])
+        filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
+        filter_cat = "and".join(x for x in filter_gabungan[1][2:])
+        # filter22 = "and".join(x for x in filter_gabungan[1])
+        # cek_kolom = conn.query("SELECT * from ppmpkm limit 1;")
+
+        # kolom_selected = st.multiselect(
+        #     "Pilih Kolom Data Yang Dibutuhkan",
+        #     cek_kolom.columns,
+        #     on_change=None,
+        # )
+
+        # cek_ = set(kolom_selected)
+        # listkolom = ",".join(['"' + x + '"' for x in kolom_selected])
+
+        if st.checkbox("Tampilkan Sample Data?"):
+            df_explore = explore_data(filter_date, filter_date22, filter_cat)
+
+            # filtered_df = filter_dataframe(df_explore, key=unique_key(34))
+            # duplicate_cols = df_explore[df_explore.duplicated()]
+
+            # df_explore.drop(columns=duplicate_cols, inplace=True)
+
+            # aggrid(df_explore)
+            gb = GridOptionsBuilder.from_dataframe(df_explore)
+            gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=20)
+            gb.configure_side_bar()
+            gb.configure_default_column(
+                groupable=True,
+                value=True,
+                enableRowGroup=True,
+                aggFunc="sum",
+                editable=True,
+            )
+            k_sep_formatter = st_ag.JsCode
+            (
+                """function(params) {
+                return (params.value == null) ? params.value : params.value.toLocaleString();
+            }"""
+            )
+            gb.configure_columns(["NOMINAL", "sum"], valueFormatter=k_sep_formatter)
+            # gb.configure_column(
+            #     "NOMINAL",
+            #     type=["numericColumn", "numberColumnFilter", "customNumericFormat"],
+            #     valueFormatter="data.col2.toLocaleString('en-US');",
+            # )
+            # gb.configure_column(
+            #     "sum(NOMINAL)",
+            #     type=["numericColumn", "numberColumnFilter", "customNumericFormat"],
+            #     valueFormatter="data.col2.toLocaleString('en-US');",
+            # )
+            gridOptions = gb.build()
+
+            df_explore_df = AgGrid(
+                df_explore,
+                gridOptions=gridOptions,
+                fit_columns_on_grid_load=True,
+                reload_data=True,
+                editable=True,
+                allow_unsafe_jscode=True,
+            )
+
+            st.subheader("Buat Chart Self Service")
+
+        if st.checkbox("Mulai"):
+            gwalker = pyg.walk(df_explore, return_html=True)
+            components.html(gwalker, height=960, scrolling=True)
+
+        # else:
+        #     st.warning("Silakan Pilih Kolom yang dibutuhkan saja agar hemat memori")
+
+
+elif "authenticated" not in st.session_state:
+    st.warning("🚨🚨Silakan Login Dulu🚨🚨")
+elif st.session_state["authenticated"] == False:
+    st.write("🤖Anda tidak punya akses, kontak administrator @Seksi Data Potensi")
+
 else:
-    if st.session_state["authenticated"]:
-        st.write("You do not have access. Please contact the administrator.")
-    else:
-        st.write("Please login!")
+    st.warning("🚨🚨Silakan Login Dulu🚨🚨")

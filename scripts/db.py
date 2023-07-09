@@ -1,10 +1,22 @@
 import pandas as pd
-from sqlalchemy import create_engine
-from urllib.parse import quote_plus
+
 import calendar
 import streamlit as st
 import random
+import os
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
 
+load_dotenv()
+# conn_uri = os.environ.get("CONN_URI")
+postgres_username = os.environ.get("POSTGRES_USERNAME")
+postgres_password = os.environ.get("POSTGRES_PASSWORD")
+postgres_url = os.environ.get("POSTGRES_URL")
+postgres_table = os.environ.get("POSTGRES_TABLE")
+
+conn_postgres = create_engine(
+    f"postgresql://{postgres_username}:{postgres_password}@{postgres_url}/{postgres_table}"
+)
 conn = st.experimental_connection("ppmpkm", type="sql")
 dict_sektor = {
     "PERTANIAN, KEHUTANAN DAN PERIKANAN": "PERTANIAN, KEHUTANAN DAN PERIKANAN",
@@ -958,6 +970,34 @@ def top10kpp(filter_date, filter_date22, filter_cat):
         """
     data = conn.query(kueri)
     # data["TUMBUH"] = data["TUMBUH"].round(2)
+    return data
+
+
+def explore_data(filter_date, filter_date22, filter_cat) -> pd.DataFrame:
+    if filter_cat:
+        kueri = f"""
+        SELECT 
+        p."ADMIN" ,p."NAMA_WP" ,p."MAP",p."KDBAYAR" ,p."NM_KATEGORI",p."NM_GOLPOK" ,p."NAMA_KLU" , p."KET" ,
+        p."BULANBAYAR" ,p."TAHUNBAYAR" ,p."DATEBAYAR" ,p."NAMA_AR" ,p."SEKSI" ,p."SEGMENTASI_WP" , 
+        ,sum(p."NOMINAL") as "NOMINAL"
+        FROM  ppmpkm p 
+        where {filter_cat} and({filter_date}) 
+        GROUP BY p."ADMIN" ,p."NAMA_WP" ,p."MAP",p."KDBAYAR" ,p."NM_KATEGORI",p."NM_GOLPOK" ,p."NAMA_KLU" , p."KET" ,
+        p."BULANBAYAR" ,p."TAHUNBAYAR" ,p."DATEBAYAR" ,p."NAMA_AR" ,p."SEKSI" ,p."SEGMENTASI_WP"
+        """
+    else:
+        kueri = f"""
+        SELECT 
+        p."ADMIN" ,p."NAMA_WP" ,p."MAP",p."KDBAYAR" ,p."NM_KATEGORI",p."NM_GOLPOK" ,p."NAMA_KLU" , p."KET" ,
+        p."BULANBAYAR" ,p."TAHUNBAYAR" ,p."DATEBAYAR" ,p."NAMA_AR" ,p."SEKSI" ,p."SEGMENTASI_WP"
+        ,sum(p."NOMINAL") as "NOMINAL"
+        FROM  ppmpkm p 
+        where ({filter_date}) 
+        GROUP BY p."ADMIN" ,p."NAMA_WP" ,p."MAP",p."KDBAYAR" ,p."NM_KATEGORI",p."NM_GOLPOK" ,p."NAMA_KLU" , p."KET" ,
+        p."BULANBAYAR" ,p."TAHUNBAYAR" ,p."DATEBAYAR" ,p."NAMA_AR" ,p."SEKSI" ,p."SEGMENTASI_WP"
+        """
+    # data = pl.read_database(query=kueri, connection_uri=conn_uri, engine="adbc")
+    data = pd.read_sql(kueri, con=conn_postgres)
     return data
 
 
