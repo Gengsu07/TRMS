@@ -71,6 +71,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+background = "rgba(0, 0, 0, 0.0)"
+background_mom = "rgba(0, 0, 0, 0.0)"
+background_alco = "rgba(0, 0, 0, 0.0)"
+background_kpi = "#fff"
+
 
 # Function/module
 def generate_random_string(char, length):
@@ -271,7 +276,7 @@ if (
             with open("style/darkmode.css") as f:
                 st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
             st.session_state["darkmode"] = "on"
-            background = "rgba(0, 0, 0, 0.0)"
+            background = background
             background_mom = "rgba(255, 255, 255, 0.95)"
             background_alco = "rgba(0, 0, 0, 0.0)"
             background_kpi = "#282a36"

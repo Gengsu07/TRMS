@@ -5,7 +5,7 @@ FROM python:3.9-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y python3-dev libpq-dev build-essential 
+    apt-get install -y cron python3-dev libpq-dev build-essential 
 
 
 COPY . .
@@ -25,4 +25,4 @@ EXPOSE 8501
 
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health
 
-ENTRYPOINT ["streamlit", "run", "_🏢Beranda.py", "--server.port=8501", "--server.address=0.0.0.0"]
+ENTRYPOINT ["streamlit", "run", "Home.py", "--server.port=8501", "--server.address=0.0.0.0"]

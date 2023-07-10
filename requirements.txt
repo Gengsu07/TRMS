@@ -10,4 +10,5 @@ streamlit-option-menu
 pygwalker
 streamlit-aggrid
 mysql-connector-python
-mysqlclient
+mysql-connector
+python-dotenv
