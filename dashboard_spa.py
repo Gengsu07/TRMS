@@ -15,7 +15,7 @@ from streamlit_toggle import st_toggle_switch
 from streamlit_option_menu import option_menu
 from math import ceil
 import string
-import components.authenticate as authenticate
+import streamlit_authenticator as stauth
 import pygwalker as pyg
 import streamlit.components.v1 as components
 import st_aggrid as st_ag
@@ -54,7 +54,7 @@ from scripts.db import (
     map_mom,
 )
 from scripts.aggrid import aggrid
-
+import scripts.database as db
 from scripts.filter_dataframe import filter_dataframe
 
 # settings
@@ -217,18 +217,37 @@ def format_number(x):
     return number
 
 
+
+
 if "darkmode" not in st.session_state:
     st.session_state["darkmode"] = "off"
 
+def user_dict():
+    users = db.fetch_all_users()
+    list_dict = []
+    for user in users:
+        mask_dict = {
+            "usernames": {
+                user["key"]: {
+                    "email": None,
+                    "name": user["name"],
+                    "password": user["password"],
+                }
+            }
+        }
 
-if (
-    st.session_state["authenticated"]
-    and "superuser" in st.session_state["user_cognito_groups"]
-):
-    # auth_code = str(st.session_state["auth_code"])
-    # access_token, id_token = authenticate.get_user_tokens(auth_code)
-    # user_info = authenticate.get_user_info(access_token)
-    # st.write(st.session_state["user_cognito_groups"])
+        list_dict.append(mask_dict)
+    combined_dict = {}
+    for d in list_dict:
+        for key, value in d.items():
+            combined_dict.setdefault(key, {}).update(value)
+    return combined_dict
+
+credentials = user_dict()
+authenticator = stauth.Authenticate(credentials,'trms_login','KilauJaktim',cookie_expiry_days=30)
+name, authentication_status, username = authenticator.login("Login-TRMS","main")
+
+if st.session_state["authentication_status"]:
     tabs = option_menu(
         None,
         ["Dashboard", "ALCo", "SelfAnalytics"],
@@ -285,13 +304,11 @@ if (
 
     with colmain[1]:
         st.title("Tax Revenue Monitoring Sistem🚀")
+        st.write(f'Salam Satu Bahu {name}')
 
         # st.text(f" Salam Satu Bahu: {nama}")
     with colmain[2]:
-        if st.session_state["authenticated"]:
-            authenticate.button_logout()
-        else:
-            authenticate.button_login()
+        authenticator.logout('Logout', 'main')
         #         access_token, id_token = authenticate.get_user_tokens(
         #             st.session_state["auth_code"]
         #         )
@@ -451,9 +468,7 @@ if (
         try:
             linedata = linedata(filter, filter22)
             linedata = (
-                linedata.groupby(["TAHUNBAYAR", "BULANBAYAR"])["sum"]
-                .sum()
-                .reset_index()
+                linedata.groupby(["TAHUNBAYAR", "BULANBAYAR"])["sum"].sum().reset_index()
             )
             linedata["text"] = linedata["sum"].apply(lambda x: format_angka(x))
 
@@ -508,9 +523,7 @@ if (
                 x="BULANBAYAR",
                 y=linedata["capaian_kumulatif"],
                 color="TAHUNBAYAR",
-                text=linedata["capaian_kumulatif"].apply(
-                    lambda x: "{:,.2f}%".format(x)
-                ),
+                text=linedata["capaian_kumulatif"].apply(lambda x: "{:,.2f}%".format(x)),
                 height=380,
                 color_discrete_sequence=["#ffca19", "#02275d"],
                 markers=True,
@@ -683,8 +696,7 @@ if (
                         if counter <= len(sektor_mom_top4["NM_KATEGORI"].unique()):
                             with col[x - 1]:
                                 data_col = sektor_mom_top4[
-                                    sektor_mom_top4["NM_KATEGORI"]
-                                    == top4_kat[counter - 1]
+                                    sektor_mom_top4["NM_KATEGORI"] == top4_kat[counter - 1]
                                 ]
                                 data_col["MoM_GROWTH"] = (
                                     data_col["BRUTO2023"].pct_change(periods=1)
@@ -1165,9 +1177,9 @@ if (
             capaian_table.loc[:, "TARGET2023":"REALISASI2023"] = capaian_table.loc[
                 :, "TARGET2023":"REALISASI2023"
             ].applymap(lambda x: "{:,.2f}M".format(x / 1000000000))
-            capaian_table.loc[:, "capaian":] = capaian_table.loc[
-                :, "capaian":
-            ].applymap(lambda x: "{:,.2f}%".format(x))
+            capaian_table.loc[:, "capaian":] = capaian_table.loc[:, "capaian":].applymap(
+                lambda x: "{:,.2f}%".format(x)
+            )
             # capaian_table = ff.create_table(capaian_table)
             avg_capaian = capaian["capaian"].mean()
             avg_tumbuh = capaian["tumbuh"].mean()
@@ -1361,9 +1373,7 @@ if (
                             ]
                             sektor_mom_select.drop(columns="NM_KATEGORI", inplace=True)
                             sektor_mom_select = (
-                                sektor_mom_select.groupby("BULANBAYAR")
-                                .sum()
-                                .reset_index()
+                                sektor_mom_select.groupby("BULANBAYAR").sum().reset_index()
                             )
                             # sektor_mom_select = sektor_mom_select.melt(
                             #     id_vars="BULANBAYAR", value_name="NOMINAL", var_name="JENIS"
@@ -1433,9 +1443,7 @@ if (
                             ]
                             sektor_mom_select.drop(columns="NM_KATEGORI", inplace=True)
                             sektor_mom_select = (
-                                sektor_mom_select.groupby("BULANBAYAR")
-                                .sum()
-                                .reset_index()
+                                sektor_mom_select.groupby("BULANBAYAR").sum().reset_index()
                             )
                             # sektor_mom_select = sektor_mom_select.melt(
                             #     id_vars="BULANBAYAR", value_name="NOMINAL"
@@ -1484,9 +1492,7 @@ if (
             nama_sektor = data_subsektor["NM_KATEGORI"].unique().tolist()
             tab_subsekstor = st.selectbox("Pilih Sektor:", nama_sektor, 0)
             # if tab_subsekstor:
-            subsektor_df = data_subsektor[
-                data_subsektor["NM_KATEGORI"] == tab_subsekstor
-            ]
+            subsektor_df = data_subsektor[data_subsektor["NM_KATEGORI"] == tab_subsekstor]
 
             node_subsektor, sankey_subsektor = sankey_subsektor(
                 subsektor_df, tab_subsekstor
@@ -1574,9 +1580,7 @@ if (
 
             subsektor_table = subsektor_df.drop(columns=["NM_KATEGORI", "NAMA_KLU"])
             subsektor_table = subsektor_table.groupby("Sub Sektor").sum().reset_index()
-            subsektor_table["Selisih"] = (
-                subsektor_table["2023"] - subsektor_table["2022"]
-            )
+            subsektor_table["Selisih"] = subsektor_table["2023"] - subsektor_table["2022"]
             subsektor_table["Tumbuh"] = (
                 subsektor_table["Selisih"] / subsektor_table["2022"]
             ) * 100
@@ -1657,10 +1661,7 @@ if (
         #     st.warning("Silakan Pilih Kolom yang dibutuhkan saja agar hemat memori")
 
 
-elif "authenticated" not in st.session_state:
-    st.warning("🚨🚨Silakan Login Dulu🚨🚨")
-elif st.session_state["authenticated"] == False:
-    st.write("🤖Anda tidak punya akses, kontak administrator @Seksi Data Potensi")
-
-else:
-    st.warning("🚨🚨Silakan Login Dulu🚨🚨")
+elif st.session_state["authentication_status"]==False:
+     st.error("🚨🚨User atau Password Salah🚨🚨")
+elif st.session_state["authentication_status"]  == None:
+    st.warning("🚨🚨Silakan Isi Username dan Password🚨🚨")

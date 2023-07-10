@@ -1,5 +1,4 @@
 import pandas as pd
-
 import calendar
 import streamlit as st
 import random
@@ -8,6 +7,7 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
 load_dotenv()
+conn = st.experimental_connection("ppmpkm", type="sql")
 # conn_uri = os.environ.get("CONN_URI")
 postgres_username = os.environ.get("POSTGRES_USERNAME")
 postgres_password = os.environ.get("POSTGRES_PASSWORD")
@@ -17,7 +17,7 @@ postgres_table = os.environ.get("POSTGRES_TABLE")
 conn_postgres = create_engine(
     f"postgresql://{postgres_username}:{postgres_password}@{postgres_url}/{postgres_table}"
 )
-conn = st.experimental_connection("ppmpkm", type="sql")
+
 dict_sektor = {
     "PERTANIAN, KEHUTANAN DAN PERIKANAN": "PERTANIAN, KEHUTANAN DAN PERIKANAN",
     "PEJABAT NEGARA, KARYAWAN, PENSIUNAN, TIDAK/BELUM BEKERJA": "PEJABAT NEGARA, KARYAWAN, PENSIUNAN",

@@ -1,6 +1,6 @@
 import streamlit as st
 from streamlit_toggle import st_toggle_switch
-import components.authenticate as authenticate
+
 from streamlit_extras.switch_page_button import switch_page
 
 
@@ -30,10 +30,5 @@ st.title("Tax Revenue Monitoring Sistem🚀")
 st.markdown("### Kanwil DJP Jakarta Timur")
 st.text(f" Salam Satu Bahu")
 
-authenticate.set_st_state_vars()
+
 # Add login/logout buttons
-if st.session_state["authenticated"]:
-    switch_page("dashboard_spa")
-    authenticate.button_logout()
-else:
-    authenticate.button_login()

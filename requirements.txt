@@ -12,3 +12,4 @@ streamlit-aggrid
 mysql-connector-python
 mysql-connector
 python-dotenv
+deta
