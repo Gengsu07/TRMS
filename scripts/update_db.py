@@ -2,8 +2,9 @@ from sqlalchemy import create_engine
 import pandas as pd
 import os
 from dotenv import load_dotenv
-import datetime
+from datetime import datetime
 from urllib.parse import quote_plus
+import pytz
 
 # from realisasi import alco_perbulan
 load_dotenv()
@@ -201,5 +202,6 @@ if __name__ == "__main__":
     data.to_sql(
         "ppmpkm", con=conn_postgres, schema="public", index=False, if_exists="replace"
     )
-    print(f"SUKSESS at:{datetime.date()}")
+    tz_jkt = pytz("Asia/Jakarta")
+    print(f'SUKSESS at:{datetime.now(tz_jkt).strftime("%m/%d/%Y, %H:%M:%S")}')
     # export_postgres(data, sql_table="ppmpkm", schema="public")
