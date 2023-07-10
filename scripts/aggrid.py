@@ -4,12 +4,23 @@ from st_aggrid.grid_options_builder import GridOptionsBuilder
 
 
 def aggrid(df_explore):
-    df_explore["NOMINAL"] = df_explore["NOMINAL"].round(0)
+    try:
+        numeric_columns = df_explore.select_dtypes(include=["int", "float"]).columns
+
+        df_explore[[numeric_columns]] = df_explore[[numeric_columns]].round(0)
+    except:
+        pass
     gb = GridOptionsBuilder.from_dataframe(df_explore)
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=30)
     gb.configure_side_bar()
     gb.configure_default_column(
-        groupable=True, value=True, enableRowGroup=True, aggFunc="sum"
+        groupable=True,
+        value=True,
+        enableRowGroup=True,
+        aggFunc="sum",
+        resizable=True,
+        filterable=True,
+        sortable=True,
     )
     # k_sep_formatter = st_ag.JsCode
     # (
@@ -21,6 +32,9 @@ def aggrid(df_explore):
         "NOMINAL",
         type=["numericColumn", "numberColumnFilter", "customNumericFormat"],
         valueFormatter="data.NOMINAL.toLocaleString('en-US');",
+    )
+    gb.configure_columns(
+        numeric_columns, valueFormatter="value.toLocaleString()", aggFunc="sum"
     )
     # gb.configure_column(
     #     "sum(NOMINAL)",

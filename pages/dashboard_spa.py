@@ -1589,8 +1589,10 @@ if (
             # colorscale = [[0, "#005FAC"], [0.5, "#f2e5ff"], [1, "#ffffff"]]
             # subsektor_df = ff.create_table(subsektor_df, colorscale=colorscale)
 
-            st.dataframe(subsektor_table, use_container_width=True, hide_index=True)
-            st.dataframe(klu_df, use_container_width=True, hide_index=True)
+            aggrid(subsektor_table)
+            aggrid(klu_df)
+            # st.dataframe(subsektor_table, use_container_width=True, hide_index=True)
+            # st.dataframe(klu_df, use_container_width=True, hide_index=True)
 
         # TUMBUH BULANAN-----------------------------------------------------------------------
         st.subheader("💡 Pertumbuhan Bulanan")
