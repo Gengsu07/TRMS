@@ -9,3 +9,5 @@ entrypoints
 streamlit-option-menu
 pygwalker
 streamlit-aggrid
+mysql-connector-python
+mysqlclient

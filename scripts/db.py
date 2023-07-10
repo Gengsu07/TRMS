@@ -1000,7 +1000,7 @@ def explore_data(filter_date, filter_date22, filter_cat) -> pd.DataFrame:
         ORDER BY sum(p."NOMINAL") desc
         """
     # data = pl.read_database(query=kueri, connection_uri=conn_uri, engine="adbc")
-    data = pd.read_sql(kueri, con=conn_postgres)
+    data = conn.query(kueri)
     return data
 
 

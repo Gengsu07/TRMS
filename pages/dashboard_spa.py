@@ -175,6 +175,7 @@ def filter_ui():
                     """
         )
         wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
+
     return [start, end, kpp, map, sektor, segmen, wp]
 
 
@@ -271,7 +272,9 @@ if (
                 st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
             st.session_state["darkmode"] = "on"
             background = "rgba(0, 0, 0, 0.0)"
+            background_mom = "rgba(255, 255, 255, 0.95)"
             background_alco = "rgba(0, 0, 0, 0.0)"
+            background_kpi = "#282a36"
         else:
             st.session_state["darkmode"] = "off"
 
@@ -300,7 +303,7 @@ if (
 
         # KPI-----------------------------------------------------------------------------------
         style_metric_cards(
-            background_color="#FFFFFF",
+            background_color=background_kpi,
             border_color="#28377a",
             border_left_color="#28377a",
         )
@@ -639,7 +642,7 @@ if (
             with chart_container(data_sektor):
                 st.plotly_chart(sektor_chart, use_container_width=True)
             # ------------------------------------------------------------------------------------------------------
-            top4_kat = data_sektor.nlargest(4, columns="BRUTO2023")
+            top4_kat = data_sektor.nlargest(6, columns="BRUTO2023")
             top4_kat = top4_kat["NM_KATEGORI"].tolist()
 
             sektor_mom = data_sektor_awal[1]
@@ -652,32 +655,35 @@ if (
             sektor_mom = sektor_mom.sort_values(
                 by=["NM_KATEGORI", "BULANBAYAR"], ascending=True
             )
-            sektor_mom["MoM_GROWTH"] = (
-                sektor_mom["BRUTO2023"].pct_change(periods=1)
-            ) * 100
+
             sektor_mom_top4 = sektor_mom[sektor_mom["NM_KATEGORI"].isin(top4_kat)]
-            st.subheader("Month Over Month Growth 4 Sektor Terbesar")
-            rows = ceil(len(sektor_mom_top4["NM_KATEGORI"].unique()) / 2)
+            st.subheader("Month Over Month Growth 6 Sektor Terbesar")
+
+            rows = ceil(len(sektor_mom_top4["NM_KATEGORI"].unique()) / 3)
             container = {}
             counter = 1
             for row in range(1, rows + 1):
                 container[row] = st.container()
                 with container[row]:
                     cekisi = len(sektor_mom_top4["NM_KATEGORI"].unique())
-                    cek_baris = ceil(cekisi / 2)
-                    sisa4 = cekisi % 2
+                    cek_baris = ceil(cekisi / 3)
+                    sisa4 = cekisi % 3
                     if row < cek_baris:
-                        col = st.columns(2)
+                        col = st.columns(3)
                     elif sisa4 == 1:
                         col = st.columns([50, 50])
-                    for x in range(1, 3):
+                    elif sisa4 == 2:
+                        col = st.columns(3)
+                    for x in range(1, 4):
                         if counter <= len(sektor_mom_top4["NM_KATEGORI"].unique()):
                             with col[x - 1]:
                                 data_col = sektor_mom_top4[
                                     sektor_mom_top4["NM_KATEGORI"]
                                     == top4_kat[counter - 1]
                                 ]
-
+                                data_col["MoM_GROWTH"] = (
+                                    data_col["BRUTO2023"].pct_change(periods=1)
+                                ) * 100
                                 data_col["WARNA"] = data_col["MoM_GROWTH"].apply(
                                     lambda x: "Merah" if x < 0 else "Hijau"
                                 )
@@ -703,7 +709,7 @@ if (
                                     ),
                                     showlegend=False,
                                     bargap=0.2,
-                                    paper_bgcolor=background,
+                                    paper_bgcolor=background_mom,
                                     plot_bgcolor="rgba(0, 0, 0, 0)",
                                 )
 
@@ -808,7 +814,7 @@ if (
                 st.plotly_chart(mapchart, use_container_width=True)
 
             # -----------------------------------------------------------------------------------------
-            top4_map = jenis_pajak9.nlargest(4, columns="BRUTO2023")
+            top4_map = jenis_pajak9.nlargest(6, columns="BRUTO2023")
             top4_map = top4_map["MAP"].tolist()
 
             map_mom = map_mom(filter)
@@ -820,22 +826,24 @@ if (
             # map_mom["MoM_GROWTH"] = (map_mom["NOMINAL"].pct_change(periods=1)) * 100
             map_mom_top4 = map_mom[map_mom["MAP"].isin(top4_map)]
 
-            st.subheader("Month Over Month Growth 4 Jenis Pajak Terbesar")
+            st.subheader("Month Over Month Growth 6 Jenis Pajak Terbesar")
 
-            rows = ceil(len(map_mom_top4["MAP"].unique()) / 2)
+            rows = ceil(len(map_mom_top4["MAP"].unique()) / 3)
             container = {}
             counter = 1
             for row in range(1, rows + 1):
                 container[row] = st.container()
                 with container[row]:
                     cekisi = len(map_mom_top4["MAP"].unique())
-                    cek_baris = ceil(cekisi / 2)
-                    sisa4 = cekisi % 2
+                    cek_baris = ceil(cekisi / 3)
+                    sisa4 = cekisi % 3
                     if row < cek_baris:
-                        col = st.columns(2)
+                        col = st.columns(3)
                     elif sisa4 == 1:
-                        col = st.columns([50, 50])
-                    for x in range(1, 3):
+                        col = st.columns([33.3])
+                    elif sisa4 == 2:
+                        col = st.columns(3)
+                    for x in range(1, 4):
                         if counter <= len(map_mom_top4["MAP"].unique()):
                             with col[x - 1]:
                                 data_col = map_mom_top4[
@@ -872,7 +880,7 @@ if (
                                     ),
                                     showlegend=False,
                                     bargap=0.2,
-                                    paper_bgcolor=background,
+                                    paper_bgcolor=background_mom,
                                     plot_bgcolor="rgba(0, 0, 0, 0)",
                                 )
 
