@@ -15,12 +15,18 @@ from streamlit_toggle import st_toggle_switch
 from streamlit_option_menu import option_menu
 from math import ceil
 import string
-import streamlit_authenticator as stauth
+
+# import streamlit_authenticator as stauth
 import pygwalker as pyg
 import streamlit.components.v1 as components
+from components import streamlit_authenticator as stauth
 import st_aggrid as st_ag
 from st_aggrid import AgGrid
 from st_aggrid.grid_options_builder import GridOptionsBuilder
+import sqlite3
+
+conn_sqlite = sqlite3.connect("login.db")
+c = conn_sqlite.cursor()
 
 
 st.set_page_config(
@@ -64,12 +70,7 @@ with open("style/style.css") as f:
 
 
 conn = st.experimental_connection("ppmpkm", type="sql")
-st.markdown(
-    """
-    <a href="#tax-revenue-monitoring-sistem" onclick="document.getElementById('cek').scrollIntoView(); return false;" class="floating-button">Filter Data</a>
-    """,
-    unsafe_allow_html=True,
-)
+
 
 background = "rgba(0, 0, 0, 0.0)"
 background_mom = "rgba(0, 0, 0, 0.0)"
@@ -78,6 +79,40 @@ background_kpi = "#fff"
 
 
 # Function/module
+def fetch_all():
+    c.execute("SELECT * FROM users")
+    data = c.fetchall()
+    return data
+
+
+def get_adm(username):
+    c.execute(f"SELECT adm from users where username={username}")
+    data = c.fetchall()
+    return data
+
+
+def user_dict():
+    users = fetch_all()
+    list_dict = []
+    for user in users:
+        mask_dict = {
+            "usernames": {
+                user[0]: {
+                    "adm": user[3],
+                    "name": user[1],
+                    "password": user[2],
+                }
+            }
+        }
+
+        list_dict.append(mask_dict)
+    combined_dict = {}
+    for d in list_dict:
+        for key, value in d.items():
+            combined_dict.setdefault(key, {}).update(value)
+    return combined_dict
+
+
 def generate_random_string(char, length):
     random.seed(10)
     temp = []
@@ -150,36 +185,78 @@ def cek_filter(start, end, kpp, map, sektor, segmen, wp):
     return [filter_gabungan, filter_gabungan22]
 
 
-def filter_ui():
+def filter_ui(adm):
+    adm_str = f"'{adm}'"
     col_filter = st.columns([1, 1, 1, 2, 2, 2, 2])
-    with col_filter[0]:
-        mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
-        start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
-    with col_filter[1]:
-        end = st.date_input("Tgl Akhir", max_value=date.today())
-    with col_filter[2]:
-        kpp = conn.query('select distinct "ADMIN" from ppmpkm where "ADMIN" notnull')
-        kpp = st.multiselect("KPP", options=kpp.iloc[:, 0].tolist())
-    with col_filter[3]:
-        map = conn.query('select distinct "MAP" from ppmpkm where "MAP" notnull')
-        map = st.multiselect("MAP", options=map.iloc[:, 0].tolist())
-    with col_filter[4]:
-        sektor = conn.query(
-            'select distinct "NM_KATEGORI" from ppmpkm where "NM_KATEGORI" notnull'
-        )
-        sektor = st.multiselect("SEKTOR", options=sektor.iloc[:, 0].tolist())
-    with col_filter[5]:
-        segmen = conn.query(
-            """select distinct "SEGMENTASI_WP" from ppmpkm where "SEGMENTASI_WP" notnull and "SEGMENTASI_WP"!='' """
-        )
-        segmen = st.multiselect("SEGMENTASI", options=segmen.iloc[:, 0].tolist())
-    with col_filter[6]:
-        # wp
-        wp = conn.query(
-            """select distinct "NAMA_WP" from ppmpkm where "NAMA_WP" notnull and "NAMA_WP"!=''
-                    """
-        )
-        wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
+    if adm != "110":
+        filter_kpp = adm_str
+    else:
+        filter_kpp = None
+
+    if filter_kpp != None:
+        with col_filter[0]:
+            mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
+            start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
+        with col_filter[1]:
+            end = st.date_input("Tgl Akhir", max_value=date.today())
+        with col_filter[2]:
+            kpp = conn.query(
+                f'select distinct "ADMIN" from ppmpkm where "ADMIN" notnull and "ADMIN"={filter_kpp}'
+            )
+            kpp = st.multiselect("KPP", options=kpp.iloc[:, 0].tolist(), default=[adm])
+        with col_filter[3]:
+            map = conn.query(
+                f'select distinct "MAP" from ppmpkm where "MAP" notnull and "ADMIN"={filter_kpp}'
+            )
+            map = st.multiselect("MAP", options=map.iloc[:, 0].tolist())
+        with col_filter[4]:
+            sektor = conn.query(
+                f'select distinct "NM_KATEGORI" from ppmpkm where "NM_KATEGORI" notnull and "ADMIN"={filter_kpp}'
+            )
+            sektor = st.multiselect("SEKTOR", options=sektor.iloc[:, 0].tolist())
+        with col_filter[5]:
+            segmen = conn.query(
+                f"""select distinct "SEGMENTASI_WP" from ppmpkm where "SEGMENTASI_WP" notnull and "SEGMENTASI_WP"!='' and "ADMIN"={filter_kpp} """
+            )
+            segmen = st.multiselect("SEGMENTASI", options=segmen.iloc[:, 0].tolist())
+        with col_filter[6]:
+            # wp
+            wp = conn.query(
+                f"""select distinct "NAMA_WP" from ppmpkm where "NAMA_WP" notnull and "NAMA_WP"!='' and "ADMIN"={filter_kpp}
+                        """
+            )
+            wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
+    else:
+        with col_filter[0]:
+            mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
+            start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
+        with col_filter[1]:
+            end = st.date_input("Tgl Akhir", max_value=date.today())
+        with col_filter[2]:
+            kpp = conn.query(
+                'select distinct "ADMIN" from ppmpkm where "ADMIN" notnull'
+            )
+            kpp = st.multiselect("KPP", options=kpp.iloc[:, 0].tolist())
+        with col_filter[3]:
+            map = conn.query('select distinct "MAP" from ppmpkm where "MAP" notnull')
+            map = st.multiselect("MAP", options=map.iloc[:, 0].tolist())
+        with col_filter[4]:
+            sektor = conn.query(
+                'select distinct "NM_KATEGORI" from ppmpkm where "NM_KATEGORI" notnull'
+            )
+            sektor = st.multiselect("SEKTOR", options=sektor.iloc[:, 0].tolist())
+        with col_filter[5]:
+            segmen = conn.query(
+                """select distinct "SEGMENTASI_WP" from ppmpkm where "SEGMENTASI_WP" notnull and "SEGMENTASI_WP"!='' """
+            )
+            segmen = st.multiselect("SEGMENTASI", options=segmen.iloc[:, 0].tolist())
+        with col_filter[6]:
+            # wp
+            wp = conn.query(
+                """select distinct "NAMA_WP" from ppmpkm where "NAMA_WP" notnull and "NAMA_WP"!=''
+                        """
+            )
+            wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
 
     return [start, end, kpp, map, sektor, segmen, wp]
 
@@ -217,37 +294,27 @@ def format_number(x):
     return number
 
 
-
-
 if "darkmode" not in st.session_state:
     st.session_state["darkmode"] = "off"
 
-def user_dict():
-    users = db.fetch_all_users()
-    list_dict = []
-    for user in users:
-        mask_dict = {
-            "usernames": {
-                user["key"]: {
-                    "email": None,
-                    "name": user["name"],
-                    "password": user["password"],
-                }
-            }
-        }
-
-        list_dict.append(mask_dict)
-    combined_dict = {}
-    for d in list_dict:
-        for key, value in d.items():
-            combined_dict.setdefault(key, {}).update(value)
-    return combined_dict
 
 credentials = user_dict()
-authenticator = stauth.Authenticate(credentials,'trms_login','KilauJaktim',cookie_expiry_days=30)
-name, authentication_status, username = authenticator.login("Login-TRMS","main")
+# c.execute("SELECT * FROM users")
+# data = c.fetchall()
+# st.write(credentials)
+
+authenticator = stauth.Authenticate(
+    credentials, "trms_login", "KilauJaktim", cookie_expiry_days=30
+)
+name, authentication_status, username = authenticator.login("Login-TRMS", "main")
 
 if st.session_state["authentication_status"]:
+    st.markdown(
+        """
+    <a href="#tax-revenue-monitoring-sistem" onclick="document.getElementById('cek').scrollIntoView(); return false;" class="floating-button">Filter Data</a>
+    """,
+        unsafe_allow_html=True,
+    )
     tabs = option_menu(
         None,
         ["Dashboard", "ALCo", "SelfAnalytics"],
@@ -304,17 +371,21 @@ if st.session_state["authentication_status"]:
 
     with colmain[1]:
         st.title("Tax Revenue Monitoring Sistem🚀")
-        st.write(f'Salam Satu Bahu {name}')
 
         # st.text(f" Salam Satu Bahu: {nama}")
     with colmain[2]:
-        authenticator.logout('Logout', 'main')
+        authenticator.logout("Logout", "main")
+        # st.write(f"Salam Satu Bahu :{name}")
         #         access_token, id_token = authenticate.get_user_tokens(
         #             st.session_state["auth_code"]
         #         )
         # st.write(st.session_state["authenticated"])
     if tabs == "Dashboard":
-        start, end, kpp, map, sektor, segmen, wp = filter_ui()
+        adm = get_adm(st.session_state["username"])[0]
+        adm = adm[0]
+
+        start, end, kpp, map, sektor, segmen, wp = filter_ui(adm)
+
         # filterdata
         filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
         filter = "and".join(x for x in filter_gabungan[0])
@@ -322,7 +393,6 @@ if st.session_state["authentication_status"]:
         filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
         filter_cat = "and".join(x for x in filter_gabungan[1][2:])
         filter22 = "and".join(x for x in filter_gabungan[1])
-
         # KPI-----------------------------------------------------------------------------------
         style_metric_cards(
             background_color=background_kpi,
@@ -399,6 +469,7 @@ if st.session_state["authentication_status"]:
             )
 
         # KET-----------------------------------------------------------------------
+
         ket = data_ket(filter, filter22).set_index("KET")
 
         colket = st.columns(5)
@@ -468,7 +539,9 @@ if st.session_state["authentication_status"]:
         try:
             linedata = linedata(filter, filter22)
             linedata = (
-                linedata.groupby(["TAHUNBAYAR", "BULANBAYAR"])["sum"].sum().reset_index()
+                linedata.groupby(["TAHUNBAYAR", "BULANBAYAR"])["sum"]
+                .sum()
+                .reset_index()
             )
             linedata["text"] = linedata["sum"].apply(lambda x: format_angka(x))
 
@@ -523,7 +596,9 @@ if st.session_state["authentication_status"]:
                 x="BULANBAYAR",
                 y=linedata["capaian_kumulatif"],
                 color="TAHUNBAYAR",
-                text=linedata["capaian_kumulatif"].apply(lambda x: "{:,.2f}%".format(x)),
+                text=linedata["capaian_kumulatif"].apply(
+                    lambda x: "{:,.2f}%".format(x)
+                ),
                 height=380,
                 color_discrete_sequence=["#ffca19", "#02275d"],
                 markers=True,
@@ -696,7 +771,8 @@ if st.session_state["authentication_status"]:
                         if counter <= len(sektor_mom_top4["NM_KATEGORI"].unique()):
                             with col[x - 1]:
                                 data_col = sektor_mom_top4[
-                                    sektor_mom_top4["NM_KATEGORI"] == top4_kat[counter - 1]
+                                    sektor_mom_top4["NM_KATEGORI"]
+                                    == top4_kat[counter - 1]
                                 ]
                                 data_col["MoM_GROWTH"] = (
                                     data_col["BRUTO2023"].pct_change(periods=1)
@@ -1177,9 +1253,9 @@ if st.session_state["authentication_status"]:
             capaian_table.loc[:, "TARGET2023":"REALISASI2023"] = capaian_table.loc[
                 :, "TARGET2023":"REALISASI2023"
             ].applymap(lambda x: "{:,.2f}M".format(x / 1000000000))
-            capaian_table.loc[:, "capaian":] = capaian_table.loc[:, "capaian":].applymap(
-                lambda x: "{:,.2f}%".format(x)
-            )
+            capaian_table.loc[:, "capaian":] = capaian_table.loc[
+                :, "capaian":
+            ].applymap(lambda x: "{:,.2f}%".format(x))
             # capaian_table = ff.create_table(capaian_table)
             avg_capaian = capaian["capaian"].mean()
             avg_tumbuh = capaian["tumbuh"].mean()
@@ -1373,7 +1449,9 @@ if st.session_state["authentication_status"]:
                             ]
                             sektor_mom_select.drop(columns="NM_KATEGORI", inplace=True)
                             sektor_mom_select = (
-                                sektor_mom_select.groupby("BULANBAYAR").sum().reset_index()
+                                sektor_mom_select.groupby("BULANBAYAR")
+                                .sum()
+                                .reset_index()
                             )
                             # sektor_mom_select = sektor_mom_select.melt(
                             #     id_vars="BULANBAYAR", value_name="NOMINAL", var_name="JENIS"
@@ -1443,7 +1521,9 @@ if st.session_state["authentication_status"]:
                             ]
                             sektor_mom_select.drop(columns="NM_KATEGORI", inplace=True)
                             sektor_mom_select = (
-                                sektor_mom_select.groupby("BULANBAYAR").sum().reset_index()
+                                sektor_mom_select.groupby("BULANBAYAR")
+                                .sum()
+                                .reset_index()
                             )
                             # sektor_mom_select = sektor_mom_select.melt(
                             #     id_vars="BULANBAYAR", value_name="NOMINAL"
@@ -1492,7 +1572,9 @@ if st.session_state["authentication_status"]:
             nama_sektor = data_subsektor["NM_KATEGORI"].unique().tolist()
             tab_subsekstor = st.selectbox("Pilih Sektor:", nama_sektor, 0)
             # if tab_subsekstor:
-            subsektor_df = data_subsektor[data_subsektor["NM_KATEGORI"] == tab_subsekstor]
+            subsektor_df = data_subsektor[
+                data_subsektor["NM_KATEGORI"] == tab_subsekstor
+            ]
 
             node_subsektor, sankey_subsektor = sankey_subsektor(
                 subsektor_df, tab_subsekstor
@@ -1580,7 +1662,9 @@ if st.session_state["authentication_status"]:
 
             subsektor_table = subsektor_df.drop(columns=["NM_KATEGORI", "NAMA_KLU"])
             subsektor_table = subsektor_table.groupby("Sub Sektor").sum().reset_index()
-            subsektor_table["Selisih"] = subsektor_table["2023"] - subsektor_table["2022"]
+            subsektor_table["Selisih"] = (
+                subsektor_table["2023"] - subsektor_table["2022"]
+            )
             subsektor_table["Tumbuh"] = (
                 subsektor_table["Selisih"] / subsektor_table["2022"]
             ) * 100
@@ -1661,7 +1745,7 @@ if st.session_state["authentication_status"]:
         #     st.warning("Silakan Pilih Kolom yang dibutuhkan saja agar hemat memori")
 
 
-elif st.session_state["authentication_status"]==False:
-     st.error("🚨🚨User atau Password Salah🚨🚨")
-elif st.session_state["authentication_status"]  == None:
-    st.warning("🚨🚨Silakan Isi Username dan Password🚨🚨")
+# elif st.session_state["authentication_status"] == False:
+#     st.error("🚨🚨User atau Password Salah🚨🚨")
+# elif st.session_state["authentication_status"] == None:
+#     st.warning("🚨🚨Silakan Isi Username dan Password🚨🚨")
