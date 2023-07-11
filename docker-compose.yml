@@ -5,15 +5,3 @@ services:
     build: .
     ports:
       - 8501:8501
-
-    nginxproxymanager:
-    image: 'jc21/nginx-proxy-manager:latest' 
-    container_name: nginxproxymanager
-    restart: unless-stopped 
-    ports:
-      - '88:80'
-      - '89:81'
-      - '444:443' 
-    volumes:
-      - ./nginx/data:/data
-      - ./nginx/letsencrypt:/etc/letsencrypt 
