@@ -58,6 +58,7 @@ from scripts.db import (
     generate_rgba_colors,
     explore_data,
     map_mom,
+    fetch_all,
 )
 from scripts.aggrid import aggrid
 import scripts.database as db
@@ -79,10 +80,6 @@ background_kpi = "#fff"
 
 
 # Function/module
-def fetch_all():
-    c.execute("SELECT * FROM users")
-    data = c.fetchall()
-    return data
 
 
 def get_adm(username):
@@ -1747,9 +1744,3 @@ if st.session_state["authentication_status"]:
 
         # else:
         #     st.warning("Silakan Pilih Kolom yang dibutuhkan saja agar hemat memori")
-
-
-# elif st.session_state["authentication_status"] == False:
-#     st.error("🚨🚨User atau Password Salah🚨🚨")
-# elif st.session_state["authentication_status"] == None:
-#     st.warning("🚨🚨Silakan Isi Username dan Password🚨🚨")

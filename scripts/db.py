@@ -5,12 +5,13 @@ import random
 import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from urllib.parse import quote_plus
 
 load_dotenv()
 conn = st.experimental_connection("ppmpkm", type="sql")
 # conn_uri = os.environ.get("CONN_URI")
 postgres_username = os.environ.get("POSTGRES_USERNAME")
-postgres_password = os.environ.get("POSTGRES_PASSWORD")
+postgres_password = quote_plus(os.environ.get("POSTGRES_PASSWORD"))
 postgres_url = os.environ.get("POSTGRES_URL")
 postgres_table = os.environ.get("POSTGRES_TABLE")
 
@@ -1015,6 +1016,15 @@ def map_mom(filter):
 """
     data = conn.query(kueri)
     return data
+
+
+def fetch_all():
+    login = pd.read_sql("select * from trms.users", con=conn_postgres)
+    login_list = []
+    for n in login.values:
+        temp = tuple(n)
+        login_list.insert(len(login_list), temp)
+    return login_list
 
 
 if __name__ == "__main__":
