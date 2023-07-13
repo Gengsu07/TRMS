@@ -63,7 +63,7 @@ header {
   background-color: white;
   border-radius: 10px;
   margin: 0rem 15%;
-  padding: 10rem 3rem;
+  padding: 3rem 3rem;
 }
 /* button[kind="secondaryFormSubmit"] {
   background-color: #f2f2f2;
@@ -84,4 +84,7 @@ div[data-testid="column"] {
 } */
 [data-testid="stAppViewContainer"] {
   background-color: #f2f2f2;
+}
+.language-python {
+  text-align: center;
 }

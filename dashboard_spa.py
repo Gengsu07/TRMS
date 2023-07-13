@@ -1381,7 +1381,9 @@ if st.session_state["authentication_status"]:
 
         # ALCO=============================================================================================================================
     elif tabs == "ALCo":
-        start, end, kpp, map, sektor, segmen, wp = filter_ui()
+        adm = get_adm(st.session_state["username"])[0]
+        adm = adm[0]
+        start, end, kpp, map, sektor, segmen, wp = filter_ui(adm)
 
         # filterdata
         filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
@@ -1702,7 +1704,9 @@ if st.session_state["authentication_status"]:
 
     elif tabs == "SelfAnalytics":
         st.subheader("Self Service Explore, Analisa, dan Membuat Chart Mandiri")
-        start, end, kpp, map, sektor, segmen, wp = filter_ui()
+        adm = get_adm(st.session_state["username"])[0]
+        adm = adm[0]
+        start, end, kpp, map, sektor, segmen, wp = filter_ui(adm)
         # filterdata
         filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
         # filter = "and".join(x for x in filter_gabungan[0])

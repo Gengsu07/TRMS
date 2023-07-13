@@ -228,6 +228,9 @@ class Authenticate:
                         st.image("assets/unit.png", width=200)
                         st.title("Tax Revenue Monitoring Sistem🚀")
                         st.text("Kanwil DJP Jakarta Timur")
+                        st.code(
+                            """ print(Username:NIP Pendek, Password:NIP Pendek@110) """
+                        )
                         login_form = st.form("Login")
                 elif location == "sidebar":
                     login_form = st.sidebar.form("Login")
