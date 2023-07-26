@@ -213,8 +213,8 @@ class Authenticate:
         if not st.session_state["authentication_status"]:
             self._check_cookie()
 
-            if location == "main":
-                if not st.session_state["authentication_status"]:
+            if not st.session_state["authentication_status"]:
+                if location == "main":
                     with open("style/home.css") as f:
                         st.markdown(
                             f"<style>{f.read()}</style>", unsafe_allow_html=True
@@ -235,18 +235,18 @@ class Authenticate:
                         )
                         login_form = st.form("Login")
                         st.warning("🚨Silakan Isi Username dan Password yang benar🚨")
-                  
-            elif location == "sidebar":
-                if not st.session_state["authentication_status"]:
-                    login_form = st.sidebar.form("Login")
+
+                elif location == "sidebar":
+                    if not st.session_state["authentication_status"]:
+                        login_form = st.sidebar.form("Login")
 
                 # login_form.subheader(form_name)
-            self.username = login_form.text_input("Username").lower()
-            st.session_state["username"] = self.username
-            self.password = login_form.text_input("Password", type="password")
+                self.username = login_form.text_input("Username").lower()
+                st.session_state["username"] = self.username
+                self.password = login_form.text_input("Password", type="password")
 
-            if login_form.form_submit_button("Login", use_container_width=False):
-                self._check_credentials()
+                if login_form.form_submit_button("Login", use_container_width=False):
+                    self._check_credentials()
 
         return (
             st.session_state["name"],

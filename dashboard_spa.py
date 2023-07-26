@@ -82,6 +82,100 @@ background_kpi = "#fff"
 # Function/module
 
 
+def login(self, form_name: str, location: str = "main") -> tuple:
+    """
+    Creates a login widget.
+
+    Parameters
+    ----------
+    form_name: str
+        The rendered name of the login form.
+    location: str
+        The location of the login form i.e. main or sidebar.
+    Returns
+    -------
+    str
+        Name of the authenticated user.
+    bool
+        The status of authentication, None: no credentials entered,
+        False: incorrect credentials, True: correct credentials.
+    str
+        Username of the authenticated user.
+    """
+
+    if location not in ["main", "sidebar"]:
+        raise ValueError("Location must be one of 'main' or 'sidebar'")
+
+    if not st.session_state["authentication_status"]:
+        self._check_cookie()
+
+        if location == "main":
+            if not st.session_state["authentication_status"]:
+                with open("style/home.css") as f:
+                    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+                col_login = st.columns([60, 120])
+                with col_login[0]:
+                    st.image(
+                        "assets/login_img.jpg",
+                        use_column_width=True,
+                    )
+
+                with col_login[1]:
+                    st.image("assets/unit.png", width=200)
+                    st.title("Tax Revenue Monitoring Sistem🚀")
+                    st.text("Kanwil DJP Jakarta Timur")
+                    st.code(""" print(Username:NIP Pendek, Password:NIP Pendek@110) """)
+                    login_form = st.form("Login")
+                    st.warning("🚨Silakan Isi Username dan Password yang benar🚨")
+
+        elif location == "sidebar":
+            if not st.session_state["authentication_status"]:
+                login_form = st.sidebar.form("Login")
+
+            # login_form.subheader(form_name)
+        self.username = login_form.text_input("Username").lower()
+        st.session_state["username"] = self.username
+        self.password = login_form.text_input("Password", type="password")
+
+        if login_form.form_submit_button("Login", use_container_width=False):
+            self._check_credentials()
+
+    return (
+        st.session_state["name"],
+        st.session_state["authentication_status"],
+        st.session_state["username"],
+    )
+
+
+def logout(self, button_name: str, location: str = "main", key: str = None):
+    """
+    Creates a logout button.
+
+    Parameters
+    ----------
+    button_name: str
+        The rendered name of the logout button.
+    location: str
+        The location of the logout button i.e. main or sidebar.
+    """
+    if location not in ["main", "sidebar"]:
+        raise ValueError("Location must be one of 'main' or 'sidebar'")
+    if location == "main":
+        if st.button(button_name, key):
+            self.cookie_manager.delete(self.cookie_name)
+            st.session_state["logout"] = True
+            st.session_state["name"] = None
+            st.session_state["username"] = None
+            st.session_state["authentication_status"] = None
+    elif location == "sidebar":
+        if st.sidebar.button(button_name, key):
+            self.cookie_manager.delete(self.cookie_name)
+            st.session_state["logout"] = True
+            st.session_state["name"] = None
+            st.session_state["username"] = None
+            st.session_state["authentication_status"] = None
+
+
 def get_adm(username):
     c.execute(f"SELECT adm from users where username={username}")
     data = c.fetchall()

@@ -1019,7 +1019,7 @@ def map_mom(filter):
 
 
 def fetch_all():
-    login = pd.read_sql("select * from trms.users", con=conn_postgres)
+    login = pd.read_sql("select * from public.users", con=conn_postgres)
     login_list = []
     for n in login.values:
         temp = tuple(n)
