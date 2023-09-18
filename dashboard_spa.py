@@ -729,7 +729,8 @@ if st.session_state["authentication_status"]:
 
         # ----------------------------------------------------------------------------------------------
         data_sankey, data_node = data_sankey(filter)
-        label = ["<b>" + label + "</b>" for label in data_node["label"].tolist()]
+
+        label = ["<b>" + str(label) + "</b>" for label in data_node["label"].tolist()]
         sankey_chart = go.Figure(
             data=[
                 go.Sankey(
