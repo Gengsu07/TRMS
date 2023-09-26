@@ -10,3 +10,4 @@ __init__
 *.xlsx
 *.db
 *.env
+scripts/*.env

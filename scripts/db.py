@@ -307,7 +307,7 @@ def sektor_yoy(filter, filter22, includewp: bool):
     sektor_yoy9["TumbuhBruto_f"] = sektor_yoy9["TumbuhBruto"].apply(
         lambda x: "{:,.1f}%".format(x)
     )
-    return [sektor_yoy9, sektor_mom, sektor_yoy, sektor_lain]
+    return [sektor_yoy9, sektor_mom, sektor_yoy]
 
 
 @st.cache_data
@@ -1053,23 +1053,24 @@ def fetch_all():
     return login_list
 
 
-def kluxmap():
+def kluxmap(filter):
     kueri = f""" 
-    select p."NM_KATEGORI",
-       p."ADMIN",
+     select p."NM_KATEGORI"::varchar,
+       p."ADMIN"::varchar,
        p."MAP",
        p."KDBAYAR",
-       sum(case when p."TAHUNBAYAR" = 2021 and p."KET" IN ('MPN', 'SPM') then p."NOMINAL" end) as "2021 Bruto",
-       sum(case when p."TAHUNBAYAR" = 2022 and p."KET" IN ('MPN', 'SPM') then p."NOMINAL" end) as "2022 Bruto",
-       sum(case when p."TAHUNBAYAR" = 2023 and p."KET" IN ('MPN', 'SPM') then p."NOMINAL" end) as "2023 Bruto",
-       sum(case when p."TAHUNBAYAR" = 2021 then p."NOMINAL" end)                               as "2021 Netto",
-       sum(case when p."TAHUNBAYAR" = 2022 then p."NOMINAL" end)                               as "2022 Netto",
-       sum(case when p."TAHUNBAYAR" = 2023 then p."NOMINAL" end)                               as "2023 Netto"
+       p."TAHUNBAYAR" ,
+       p."BULANBAYAR" ,
+       sum(case when  p."KET" IN ('MPN', 'SPM') then p."NOMINAL" end) as "Bruto",
+       sum( p."NOMINAL" )                               as "Netto"
 from ppmpkm p
-group by p."NM_KATEGORI",
-         p."ADMIN",
+where {filter}
+group by p."NM_KATEGORI"::varchar,
+         p."ADMIN"::varchar,
          p."MAP",
-         p."KDBAYAR"
+         p."KDBAYAR",
+         p."TAHUNBAYAR" ,
+         p."BULANBAYAR"
     """
     data = conn.query(kueri)
     return data

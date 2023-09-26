@@ -23,10 +23,11 @@ from components import streamlit_authenticator as stauth
 import st_aggrid as st_ag
 from st_aggrid import AgGrid
 from st_aggrid.grid_options_builder import GridOptionsBuilder
-import sqlite3
+import numpy as np
 
-conn_sqlite = sqlite3.connect("login.db")
-c = conn_sqlite.cursor()
+
+# conn_sqlite = sqlite3.connect("login.db")
+# c = conn_sqlite.cursor()
 
 
 st.set_page_config(
@@ -48,7 +49,7 @@ st.markdown(
         """,
     unsafe_allow_html=True,
 )
-
+conn = st.experimental_connection("ppmpkm", type="sql")
 from scripts.db import (
     data_ket,
     target,
@@ -192,9 +193,8 @@ def logout(self, button_name: str, location: str = "main", key: str = None):
 
 
 def get_adm(username):
-    c.execute(f"SELECT adm from users where username={username}")
-    data = c.fetchall()
-    return data
+    data = conn.query(f"SELECT adm from users where username='{username}' ")
+    return data.iloc[0, 0]
 
 
 def user_dict():
@@ -245,6 +245,50 @@ def n_color(df):
     return n_color
 
 
+def sankey_create(data_node, data_sankey, n=50, nlargest=True):
+    label = ["<b>" + str(label) + "</b>" for label in data_node["label"].tolist()]
+    if nlargest:
+        data_sankey = data_sankey.nlargest(n, columns="value")
+        konteks = "Kenaikan"
+    else:
+        data_sankey = data_sankey.nsmallest(n, columns="value")
+        data_sankey["value"] = data_sankey["value"] * -1
+        konteks = "Penurunan"
+
+    sankey_chart = go.Figure(
+        data=[
+            go.Sankey(
+                node=dict(
+                    pad=15,
+                    thickness=20,
+                    line=dict(color="blue", width=0.5),
+                    label=label,
+                    color=n_color(data_sankey),
+                ),
+                link=dict(
+                    source=data_sankey["source"],
+                    target=data_sankey["target"],
+                    value=data_sankey["value"],
+                    color=n_color(data_sankey),
+                ),
+                valueformat=".2s",
+            )
+        ]
+    )
+    sankey_chart.update_layout(
+        height=860,
+        title=dict(
+            text=f"{n} Besar {konteks} Sebaran Sektor ke Jenis Pajak",
+            font=dict(color="#28377a", size=26),
+            x=0.3,
+            y=0.95,
+        ),
+        paper_bgcolor=background,
+        plot_bgcolor="#ECF9FF",
+    )
+    return sankey_chart
+
+
 @st.cache_resource
 def list_to_sql(column, value):
     value_str = ",".join([f"'{x}'" for x in value])
@@ -291,7 +335,7 @@ def cek_filter(start, end, kpp, map, sektor, segmen, wp):
     return [filter_gabungan, filter_gabungan22]
 
 
-def filter_ui(adm):
+def filter_ui(adm, timeseries=False):
     adm_str = f"'{adm}'"
     col_filter = st.columns([1, 1, 1, 2, 2, 2, 2])
     if adm != "110":
@@ -299,9 +343,14 @@ def filter_ui(adm):
     else:
         filter_kpp = None
 
+    if timeseries:
+        datestart = "2021-01-01"
+    else:
+        datestart = "2023-01-01"
+
     if filter_kpp != None:
         with col_filter[0]:
-            mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
+            mindate = datetime.strptime(f"{datestart}", "%Y-%m-%d")
             start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
         with col_filter[1]:
             end = st.date_input("Tgl Akhir", max_value=date.today())
@@ -334,7 +383,7 @@ def filter_ui(adm):
             wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
     else:
         with col_filter[0]:
-            mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
+            mindate = datetime.strptime(f"{datestart}", "%Y-%m-%d")
             start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
         with col_filter[1]:
             end = st.date_input("Tgl Akhir", max_value=date.today())
@@ -489,8 +538,7 @@ if st.session_state["authentication_status"]:
     )
 
     if tabs == "Dashboard":
-        adm = get_adm(st.session_state["username"])[0]
-        adm = adm[0]
+        adm = get_adm(st.session_state["username"])
 
         start, end, kpp, map, sektor, segmen, wp = filter_ui(adm)
 
@@ -748,37 +796,11 @@ if st.session_state["authentication_status"]:
         # ----------------------------------------------------------------------------------------------
         data_sankey, data_node = data_sankey(filter)
 
-        label = ["<b>" + str(label) + "</b>" for label in data_node["label"].tolist()]
-        sankey_chart = go.Figure(
-            data=[
-                go.Sankey(
-                    node=dict(
-                        pad=15,
-                        thickness=20,
-                        line=dict(color="blue", width=0.5),
-                        label=label,
-                        color=n_color(data_sankey),
-                    ),
-                    link=dict(
-                        source=data_sankey["source"],
-                        target=data_sankey["target"],
-                        value=data_sankey["value"],
-                        color=n_color(data_sankey),
-                    ),
-                    valueformat=".2s",
-                )
-            ]
+        sankey_chart = sankey_create(
+            data_node=data_node, data_sankey=data_sankey, n=20, nlargest=True
         )
         sankey_chart.update_layout(
-            height=860,
-            title=dict(
-                text="Sebaran Penerimaan Sektor ke Jenis Pajak",
-                font=dict(color="#28377a", size=26),
-                x=0.3,
-                y=0.95,
-            ),
-            paper_bgcolor=background,
-            plot_bgcolor="#ECF9FF",
+            title=dict(text=f"{20} Besar Sebaran Sektor ke Jenis Pajak")
         )
         # st.subheader("Sebaran Penerimaan Sektor ke Jenis Pajak")
         with chart_container(data_sankey):
@@ -1492,8 +1514,7 @@ if st.session_state["authentication_status"]:
 
         # ALCO=============================================================================================================================
     elif tabs == "ALCo":
-        adm = get_adm(st.session_state["username"])[0]
-        adm = adm[0]
+        adm = get_adm(st.session_state["username"])
         start, end, kpp, map, sektor, segmen, wp = filter_ui(adm)
 
         # filterdata
@@ -1819,16 +1840,129 @@ if st.session_state["authentication_status"]:
         submenu = st.selectbox(label="Jenis Report", options=submenu_opt)
 
         if submenu == "KLU x MAP":
-            klumap = kluxmap()
-            agg_klumap = klumap.groupby(
-                ["NM_KATEGORI", "ADMIN", "MAP", "KDBAYAR"]
-            ).sum()
-            st.table(agg_klumap)
+            adm = get_adm(st.session_state["username"])
+
+            start, end, kpp, map, sektor, segmen, wp = filter_ui(adm, timeseries=True)
+            filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
+            filter = "and".join(x for x in filter_gabungan[0])
+            klumap = kluxmap(filter)
+
+            col1, col2, col3 = st.columns(3)
+            style_metric_cards(
+                background_color="rgba(0,0,0,0)",
+                border_color="rgba(0,0,0,0)",
+                border_left_color="rgba(0,0,0,0)",
+            )
+            with col1:
+                bruto = klumap[klumap["TAHUNBAYAR"] == 2021]["Bruto"].sum()
+                st.metric(label="2021", value=format_angka(bruto))
+
+            with col2:
+                bruto = klumap[klumap["TAHUNBAYAR"] == 2022]["Bruto"].sum()
+                st.metric(label="2022", value=format_angka(bruto))
+
+            with col3:
+                bruto = klumap[klumap["TAHUNBAYAR"] == 2023]["Bruto"].sum()
+                st.metric(label="2023", value=format_angka(bruto))
+
+            line_fig = px.line(
+                klumap.groupby(["TAHUNBAYAR", "BULANBAYAR"])["Bruto"]
+                .sum()
+                .reset_index(),
+                x="BULANBAYAR",
+                y="Bruto",
+                color="TAHUNBAYAR",
+                markers=True,
+            )
+            line_fig.update_layout(
+                xaxis_title="",
+                yaxis_title="",
+                yaxis={"visible": False},
+                xaxis={
+                    "tickmode": "array",
+                    "tickvals": [x for x in range(1, 13)],
+                    "ticktext": [calendar.month_name[i] for i in range(1, 13)],
+                    # "tickfont": {"color": "#fff"},
+                },
+            )
+            st.plotly_chart(line_fig, use_container_width=True)
+
+            klumap_2023 = klumap[klumap["TAHUNBAYAR"] == 2023]
+
+            sektormap = pd.pivot_table(
+                klumap,
+                index=["NM_KATEGORI", "MAP"],
+                columns="TAHUNBAYAR",
+                values="Bruto",
+                aggfunc="sum",
+            ).reset_index()
+            sektormap["2022BulanYgSama"] = (
+                klumap_2023["BULANBAYAR"].max() / 12
+            ) * sektormap[2022]
+
+            sektormap["Naik/Turun"] = sektormap[2023] - sektormap["2022BulanYgSama"]
+
+            sektormap["Ket"] = sektormap["Naik/Turun"].apply(
+                lambda x: "Naik" if x > 0 else "Turun",
+            )
+            top20_sankey = sektormap[["NM_KATEGORI", "MAP", "Naik/Turun"]]
+            data_node = pd.DataFrame(
+                pd.concat(
+                    [
+                        pd.Series(top20_sankey["NM_KATEGORI"].unique()),
+                        pd.Series(top20_sankey["MAP"].unique()),
+                    ],
+                    ignore_index=True,
+                    axis=0,
+                ),
+                columns=["label"],
+            ).reset_index()
+            top20_sankey = top20_sankey.merge(
+                data_node[["index", "label"]],
+                left_on="NM_KATEGORI",
+                right_on="label",
+                how="left",
+            )
+            top20_sankey = top20_sankey.merge(
+                data_node[["index", "label"]],
+                left_on="MAP",
+                right_on="label",
+                how="left",
+            )
+            top20_sankey.rename(
+                columns={
+                    "index_x": "source",
+                    "index_y": "target",
+                    "Naik/Turun": "value",
+                },
+                inplace=True,
+            )
+            top20_sankey.drop(columns=["label_x", "label_y"], inplace=True)
+
+            sankey_top = sankey_create(
+                data_node=data_node, data_sankey=top20_sankey, n=20, nlargest=True
+            )
+
+            sankey_bottom = sankey_create(
+                data_node=data_node, data_sankey=top20_sankey, n=20, nlargest=False
+            )
+
+            colup, colbot = st.columns(2)
+            with colup:
+                st.plotly_chart(sankey_top, use_container_width=True)
+            with colbot:
+                st.plotly_chart(sankey_bottom, use_container_width=True)
+            st.dataframe(
+                sektormap.sort_values(by=2022, ascending=False),
+                use_container_width=True,
+                hide_index=True,
+                height=720,
+            )
 
     elif tabs == "SelfAnalytics":
         st.subheader("Self Service Explore, Analisa, dan Membuat Chart Mandiri")
-        adm = get_adm(st.session_state["username"])[0]
-        adm = adm[0]
+        adm = get_adm(st.session_state["username"])
+
         start, end, kpp, map, sektor, segmen, wp = filter_ui(adm)
         # filterdata
         filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
