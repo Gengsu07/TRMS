@@ -35,6 +35,20 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+st.markdown(
+    """
+        <style>
+               .block-container {
+                    padding-top: 0rem;
+                    padding-bottom: 0rem;
+                    padding-left: 1rem;
+                    padding-right: 1rem;
+                }
+        </style>
+        """,
+    unsafe_allow_html=True,
+)
+
 from scripts.db import (
     data_ket,
     target,
@@ -59,6 +73,7 @@ from scripts.db import (
     explore_data,
     map_mom,
     fetch_all,
+    kluxmap,
 )
 from scripts.aggrid import aggrid
 import scripts.database as db
@@ -400,41 +415,6 @@ authenticator = stauth.Authenticate(
 name, authentication_status, username = authenticator.login("Login-TRMS", "main")
 
 if st.session_state["authentication_status"]:
-    st.markdown(
-        """
-    <a href="#tax-revenue-monitoring-sistem" onclick="document.getElementById('cek').scrollIntoView(); return false;" class="floating-button">Filter Data</a>
-    """,
-        unsafe_allow_html=True,
-    )
-    tabs = option_menu(
-        None,
-        ["Dashboard", "ALCo", "SelfAnalytics"],
-        icons=["bi bi-speedometer", "bi bi-bar-chart", "bi bi-messenger"],
-        menu_icon="cast",
-        default_index=0,
-        orientation="horizontal",
-        styles={
-            "container": {
-                "padding": "3!important",
-                "background-color": "#28377a",
-                "color": "#fff",
-                # "border": "2px solid #005FAC",
-                "max-width": "2560px",
-            },
-            "separator": {"color": "#005FAC"},
-            "icon": {"color": "orange", "font-size": "16"},
-            "nav-link": {
-                "font-size": "16px",
-                "text-align": "left",
-                "margin": "0px",
-                "--hover-color": "#eee",
-                "color": "#fff",
-            },
-            "nav-link-selected": {"background-color": "#ffca19"},
-            "menu-title": {"background-color": "#fff"},
-        },
-    )
-
     colmain = st.columns([1, 4, 1])
     background = "rgba(255, 255, 255, 1.0)"
     background_alco = "#f2f2f2"
@@ -471,6 +451,43 @@ if st.session_state["authentication_status"]:
         #             st.session_state["auth_code"]
         #         )
         # st.write(st.session_state["authenticated"])
+
+    # Goto Filter button
+    st.markdown(
+        """
+    <a href="#tax-revenue-monitoring-sistem" onclick="document.getElementById('cek').scrollIntoView(); return false;" class="floating-button">Filter Data</a>
+    """,
+        unsafe_allow_html=True,
+    )
+    tabs = option_menu(
+        None,
+        ["Dashboard", "ALCo", "Report", "SelfAnalytics"],
+        icons=["bi bi-speedometer", "bi bi-bar-chart", "bi bi-messenger"],
+        menu_icon="cast",
+        default_index=0,
+        orientation="horizontal",
+        styles={
+            "container": {
+                "padding": "3!important",
+                "background-color": "#28377a",
+                "color": "#fff",
+                # "border": "2px solid #005FAC",
+                "max-width": "2560px",
+            },
+            "separator": {"color": "#005FAC"},
+            "icon": {"color": "orange", "font-size": "16"},
+            "nav-link": {
+                "font-size": "16px",
+                "text-align": "left",
+                "margin": "0px",
+                "--hover-color": "#eee",
+                "color": "#fff",
+            },
+            "nav-link-selected": {"background-color": "#ffca19"},
+            "menu-title": {"background-color": "#fff"},
+        },
+    )
+
     if tabs == "Dashboard":
         adm = get_adm(st.session_state["username"])[0]
         adm = adm[0]
@@ -484,6 +501,7 @@ if st.session_state["authentication_status"]:
         filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
         filter_cat = "and".join(x for x in filter_gabungan[1][2:])
         filter22 = "and".join(x for x in filter_gabungan[1])
+
         # KPI-----------------------------------------------------------------------------------
         style_metric_cards(
             background_color=background_kpi,
@@ -800,11 +818,11 @@ if st.session_state["authentication_status"]:
             sektor_data = [sektor22, sektor23]
             sektor_layout = go.Layout(
                 barmode="group",
-                height=860,
+                height=960,
                 bargap=0.1,
                 xaxis=dict(visible=False),
                 title=dict(
-                    text="Per Sektor (Bruto)",
+                    text=f"Sektor Bruto YoY<br>{start}:{end}",
                     font=dict(color="slategrey", size=26),
                     x=0.5,
                     y=0.95,
@@ -908,6 +926,7 @@ if st.session_state["authentication_status"]:
         # data
         try:
             colsek = st.columns(2)
+
             data_sektor_table = sektor_yoy(filter, filter22, includewp=True)[2]
             data_sektor_table = data_sektor_table[
                 [
@@ -1481,6 +1500,7 @@ if st.session_state["authentication_status"]:
         filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
         filter = "and".join(x for x in filter_gabungan[0])
         filter22 = "and".join(x for x in filter_gabungan[1])
+
         style_metric_cards(
             background_color="rgba(0,0,0,0)",
             border_color="rgba(0,0,0,0)",
@@ -1794,6 +1814,17 @@ if st.session_state["authentication_status"]:
 
             st.plotly_chart(tumbuh, use_container_width=True)
 
+    elif tabs == "Report":
+        submenu_opt = ["KLU x MAP", "Tren per Seksi"]
+        submenu = st.selectbox(label="Jenis Report", options=submenu_opt)
+
+        if submenu == "KLU x MAP":
+            klumap = kluxmap()
+            agg_klumap = klumap.groupby(
+                ["NM_KATEGORI", "ADMIN", "MAP", "KDBAYAR"]
+            ).sum()
+            st.table(agg_klumap)
+
     elif tabs == "SelfAnalytics":
         st.subheader("Self Service Explore, Analisa, dan Membuat Chart Mandiri")
         adm = get_adm(st.session_state["username"])[0]
@@ -1805,6 +1836,7 @@ if st.session_state["authentication_status"]:
         filter_date = "and".join(x for x in filter_gabungan[0][:2])
         filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
         filter_cat = "and".join(x for x in filter_gabungan[1][2:])
+
         # filter22 = "and".join(x for x in filter_gabungan[1])
         # cek_kolom = conn.query("SELECT * from ppmpkm limit 1;")
 

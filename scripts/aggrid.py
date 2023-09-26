@@ -14,10 +14,10 @@ def aggrid(df_explore):
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=30)
     gb.configure_side_bar()
     gb.configure_default_column(
-        groupable=True,
-        value=True,
-        enableRowGroup=True,
-        aggFunc="sum",
+        groupable=False,
+        # value=True,
+        enableRowGroup=False,
+        # aggFunc="sum",
         resizable=True,
         filterable=True,
         sortable=True,
@@ -28,6 +28,7 @@ def aggrid(df_explore):
     # )
 
     # gb.configure_columns(["NOMINAL", "sum"], valueFormatter=k_sep_formatter)
+    gb.configure_column("MAP", pivot=True)
     gb.configure_column(
         "NOMINAL",
         type=["numericColumn", "numberColumnFilter", "customNumericFormat"],

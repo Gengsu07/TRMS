@@ -27,3 +27,9 @@ body {
   border-top: 5px solid #fff;
   border-right: 5px solid #fff;
 }
+header{
+  display: none;
+}
+.element-container.css-1d4fp9k.e1f1d6gn2{
+  display: none;
+}

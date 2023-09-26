@@ -20,29 +20,29 @@ conn_postgres = create_engine(
 )
 
 dict_sektor = {
-    "PERTANIAN, KEHUTANAN DAN PERIKANAN": "PERTANIAN, KEHUTANAN DAN PERIKANAN",
-    "PEJABAT NEGARA, KARYAWAN, PENSIUNAN, TIDAK/BELUM BEKERJA": "PEJABAT NEGARA, KARYAWAN, PENSIUNAN",
-    "AKTIVITAS PROFESIONAL, ILMIAH DAN TEKNIS": "AKTIVITAS PROFESIONAL, ILMIAH DAN TEKNIS",
-    "AKTIVITAS JASA LAINNYA": "AKTIVITAS JASA LAINNYA",
-    "AKTIVITAS BADAN INTERNASIONAL DAN BADAN EKSTRA INTERNASIONAL LAINNYA": "BADAN INTER DAN EXTRA INTERNASIONAL",
-    "INFORMASI DAN KOMUNIKASI": "INFORMASI DAN KOMUNIKASI",
-    "PENGADAAN LISTRIK, GAS, UAP/AIR PANAS DAN UDARA DINGIN": "PENGADAAN LISTRIK, GAS, UAP/AIR PANAS DAN UDARA DINGIN",
-    "ADMINISTRASI PEMERINTAHAN, PERTAHANAN DAN JAMINAN SOSIAL WAJIB": "ADMIN. PEMERINTAHAN & JAMINAN SOSIAL",
-    "PERDAGANGAN BESAR DAN ECERAN; REPARASI DAN PERAWATAN MOBIL DAN SEPEDA MOTOR": "PERDAGANGAN BESAR ECERAN & PERAWATAN MOBIL",
-    "AKTIVITAS KEUANGAN DAN ASURANSI": "AKTIVITAS KEUANGAN DAN ASURANSI",
-    "KONSTRUKSI": "KONSTRUKSI",
-    "AKTIVITAS KESEHATAN MANUSIA DAN AKTIVITAS SOSIAL": "KESEHATAN MANUSIA & AKTIVITAS SOSIAL",
-    "TREATMENT AIR, TREATMENT AIR LIMBAH, TREATMENT DAN PEMULIHAN MATERIAL SAMPAH, DAN AKTIVITAS REMEDIASI": "TREATMENT AIR,LIMBAH",
-    "PENDIDIKAN": "PENDIDIKAN",
-    "KESENIAN, HIBURAN DAN REKREASI": "KESENIAN, HIBURAN DAN REKREASI",
-    "PENGANGKUTAN DAN PERGUDANGAN": "PENGANGKUTAN DAN PERGUDANGAN",
-    "REAL ESTAT": "REAL ESTAT",
+    "A": "PERTANIAN, KEHUTANAN DAN PERIKANAN",
+    "Z": "PEJABAT NEGARA, KARYAWAN, PENSIUNAN",
+    "M": "AKTIVITAS PROFESIONAL, ILMIAH DAN TEKNIS",
+    "S": "AKTIVITAS JASA LAINNYA",
+    "U": "BADAN INTER DAN EXTRA INTERNASIONAL",
+    "J": "INFORMASI DAN KOMUNIKASI",
+    "D": "PENGADAAN LISTRIK, GAS, UAP/AIR PANAS DAN UDARA DINGIN",
+    "O": "ADMIN. PEMERINTAHAN & JAMINAN SOSIAL",
+    "G": "PERDAGANGAN BESAR ECERAN & PERAWATAN MOBIL",
+    "K": "AKTIVITAS KEUANGAN DAN ASURANSI",
+    "F": "KONSTRUKSI",
+    "Q": "KESEHATAN MANUSIA & AKTIVITAS SOSIAL",
+    "E": "TREATMENT AIR,LIMBAH",
+    "P": "PENDIDIKAN",
+    "R": "KESENIAN, HIBURAN DAN REKREASI",
+    "H": "PENGANGKUTAN DAN PERGUDANGAN",
+    "L": "REAL ESTAT",
     "": "",
-    "INDUSTRI PENGOLAHAN": "INDUSTRI PENGOLAHAN",
-    "PENYEDIAAN AKOMODASI DAN PENYEDIAAN MAKAN MINUM": "PENYEDIAAN AKOMODASI DAN PENYEDIAAN MAKAN MINUM",
-    "PERTAMBANGAN DAN PENGGALIAN": "PERTAMBANGAN DAN PENGGALIAN",
-    "AKTIVITAS PENYEWAAN DAN SEWA GUNA USAHA TANPA HAK OPSI, KETENAGAKERJAAN, AGEN PERJALANAN DAN PENUNJANG USAHA LAINNYA": "PENYEWAAN & SGU TANPA HAK OPSI",
-    "AKTIVITAS RUMAH TANGGA SEBAGAI PEMBERI KERJA; AKTIVITAS YANG MENGHASILKAN BARANG DAN JASA OLEH RUMAH TANGGA YANG DIGUNAKAN UNTUK MEMENUHI KEBUTUHAN SENDIRI": "RUMAH TANGGA PEMBERI KERJA",
+    "C": "INDUSTRI PENGOLAHAN",
+    "I": "PENYEDIAAN AKOMODASI DAN PENYEDIAAN MAKAN MINUM",
+    "B": "PERTAMBANGAN DAN PENGGALIAN",
+    "N": "PENYEWAAN & SGU TANPA HAK OPSI",
+    "T": "RUMAH TANGGA PEMBERI KERJA",
 }
 target2023 = {
     "001": 608265424000,
@@ -165,25 +165,25 @@ def sektor_yoy(filter, filter22, includewp: bool):
     if includewp:
         kueri = f"""
         SELECT p."NAMA_WP",
-        p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP",
+        p."KD_KATEGORI" ,p."NM_KATEGORI",p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP",
         sum(p."NOMINAL") AS "NETTO",
         sum(case when p."KET" in('MPN','SPM') then p."NOMINAL" end) as "BRUTO"
         FROM 
         ppmpkm p 
         WHERE {filter}
-        GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
+        GROUP BY p."NAMA_WP",p."KD_KATEGORI",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
         UNION ALL 
         SELECT p."NAMA_WP",
-        p."NM_KATEGORI" , p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP",
+        p."KD_KATEGORI",p."NM_KATEGORI" , p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP",
         sum(p."NOMINAL") AS "NETTO",
         sum(case when p."KET" in('MPN','SPM') then p."NOMINAL" end) as "BRUTO"
         FROM 
         ppmpkm p 
         WHERE {filter22}
-        GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
+        GROUP BY p."NAMA_WP",p."KD_KATEGORI" ,p."NM_KATEGORI",p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
         """
         data = conn.query(kueri)
-        data["NM_KATEGORI"] = data["NM_KATEGORI"].map(dict_sektor)
+        data["NM_KATEGORI"] = data["KD_KATEGORI"].map(dict_sektor)
         data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
 
         sektor_yoy = data.pivot_table(
@@ -215,25 +215,25 @@ def sektor_yoy(filter, filter22, includewp: bool):
     else:
         kueri = f"""
         SELECT p."NAMA_WP",
-        p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP",
+        p."KD_KATEGORI",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP",
         sum(p."NOMINAL") AS "NETTO",
         sum(case when p."KET" in('MPN','SPM') then p."NOMINAL" end) as "BRUTO"
         FROM 
         ppmpkm p 
         WHERE {filter}
-        GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
+        GROUP BY p."NAMA_WP",p."KD_KATEGORI",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
         UNION ALL 
-        SELECT p."NAMA_WP",
-        p."NM_KATEGORI" , p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP",
+        SELECT p."NAMA_WP",p."KD_KATEGORI",
+        p."NM_KATEGORI", p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP",
         sum(p."NOMINAL") AS "NETTO",
         sum(case when p."KET" in('MPN','SPM') then p."NOMINAL" end) as "BRUTO"
         FROM 
         ppmpkm p 
         WHERE {filter22}
-        GROUP BY p."NAMA_WP",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
+        GROUP BY p."NAMA_WP",p."KD_KATEGORI",p."NM_KATEGORI" ,p."TAHUNBAYAR",p."BULANBAYAR",p."JENIS_WP"
         """
         data = conn.query(kueri)
-        data["NM_KATEGORI"] = data["NM_KATEGORI"].map(dict_sektor)
+        data["NM_KATEGORI"] = data["KD_KATEGORI"].map(dict_sektor)
         data["TAHUNBAYAR"] = data["TAHUNBAYAR"].astype("str")
 
         sektor_yoy = data.pivot_table(
@@ -264,7 +264,34 @@ def sektor_yoy(filter, filter22, includewp: bool):
         sektor_mom.columns = sektor_mom.columns.map("".join)
 
     # sektor yoy[2]
-    sektor_yoy9 = sektor_yoy.nlargest(10, "NETTO2023")
+    sektor_yoy9 = sektor_yoy.nlargest(12, "NETTO2023")
+    sektor_lain = sektor_yoy[
+        ~sektor_yoy["NM_KATEGORI"].isin(sektor_yoy9["NM_KATEGORI"].tolist())
+    ]
+
+    sektor_lain_agg = pd.DataFrame(
+        [
+            [
+                "LAINNYA",
+                sektor_lain["BRUTO2022"].sum(),
+                sektor_lain["BRUTO2023"].sum(),
+                sektor_lain["NETTO2022"].sum(),
+                sektor_lain["NETTO2023"].sum(),
+            ]
+        ],
+        columns=["NM_KATEGORI", "BRUTO2022", "BRUTO2023", "NETTO2022", "NETTO2023"],
+    )
+    sektor_lain_agg["NaikBruto"] = round(
+        sektor_lain_agg["BRUTO2023"] - sektor_lain_agg["BRUTO2022"], 0
+    )
+    sektor_lain_agg["NaikNetto"] = round(
+        sektor_lain_agg["NETTO2023"] - sektor_lain_agg["NETTO2022"], 0
+    )
+    sektor_lain_agg["TumbuhBruto"] = (
+        sektor_lain_agg["NaikBruto"] / sektor_lain_agg["BRUTO2022"]
+    ) * 100
+
+    sektor_yoy9 = pd.concat([sektor_yoy9, sektor_lain_agg], axis=0, ignore_index=False)
     sektor_yoy9 = sektor_yoy9.assign(
         text22=sektor_yoy9["BRUTO2022"].apply(lambda x: format_angka(x)),
         text23=sektor_yoy9["BRUTO2023"].apply(lambda x: format_angka(x)),
@@ -276,12 +303,11 @@ def sektor_yoy(filter, filter22, includewp: bool):
     ).assign(
         kontrib2022=sektor_yoy9["Kontribusi2022"].apply(lambda x: "{:,.1f}%".format(x))
     )
-
     sektor_yoy9.sort_values(by="BRUTO2023", ascending=True, inplace=True)
     sektor_yoy9["TumbuhBruto_f"] = sektor_yoy9["TumbuhBruto"].apply(
         lambda x: "{:,.1f}%".format(x)
     )
-    return [sektor_yoy9, sektor_mom, sektor_yoy]
+    return [sektor_yoy9, sektor_mom, sektor_yoy, sektor_lain]
 
 
 @st.cache_data
@@ -1025,6 +1051,28 @@ def fetch_all():
         temp = tuple(n)
         login_list.insert(len(login_list), temp)
     return login_list
+
+
+def kluxmap():
+    kueri = f""" 
+    select p."NM_KATEGORI",
+       p."ADMIN",
+       p."MAP",
+       p."KDBAYAR",
+       sum(case when p."TAHUNBAYAR" = 2021 and p."KET" IN ('MPN', 'SPM') then p."NOMINAL" end) as "2021 Bruto",
+       sum(case when p."TAHUNBAYAR" = 2022 and p."KET" IN ('MPN', 'SPM') then p."NOMINAL" end) as "2022 Bruto",
+       sum(case when p."TAHUNBAYAR" = 2023 and p."KET" IN ('MPN', 'SPM') then p."NOMINAL" end) as "2023 Bruto",
+       sum(case when p."TAHUNBAYAR" = 2021 then p."NOMINAL" end)                               as "2021 Netto",
+       sum(case when p."TAHUNBAYAR" = 2022 then p."NOMINAL" end)                               as "2022 Netto",
+       sum(case when p."TAHUNBAYAR" = 2023 then p."NOMINAL" end)                               as "2023 Netto"
+from ppmpkm p
+group by p."NM_KATEGORI",
+         p."ADMIN",
+         p."MAP",
+         p."KDBAYAR"
+    """
+    data = conn.query(kueri)
+    return data
 
 
 if __name__ == "__main__":

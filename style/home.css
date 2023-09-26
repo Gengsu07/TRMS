@@ -88,3 +88,9 @@ div[data-testid="column"] {
 .language-python {
   text-align: center;
 }
+header{
+  display: none;
+}
+.element-container.css-1d4fp9k.e1f1d6gn2{
+  display: none;
+}
