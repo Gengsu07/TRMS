@@ -530,7 +530,7 @@ def linedata(filter, filter22):
 def naikturun(filter, filter22):
     kueri = f""" 
      SELECT
-	p."NPWP",
+	p."NPWP15",
 	p."NAMA_WP",
     p."TAHUNBAYAR",
 	SUM (p."NOMINAL") AS "NOMINAL"
@@ -539,12 +539,12 @@ def naikturun(filter, filter22):
     WHERE
         p."KET" in('MPN','SPM') AND {filter}
     GROUP BY
-        p."NPWP",
+        p."NPWP15",
         p."NAMA_WP",
         p."TAHUNBAYAR"
     UNION ALL
          SELECT
-	p."NPWP",
+	p."NPWP15",
 	p."NAMA_WP",
     p."TAHUNBAYAR",
 	SUM (p."NOMINAL") AS "NOMINAL"
@@ -553,7 +553,7 @@ def naikturun(filter, filter22):
     WHERE
         p."KET" in('MPN','SPM') AND {filter22}
     GROUP BY
-        p."NPWP",
+        p."NPWP15",
         p."NAMA_WP",
         p."TAHUNBAYAR"
         """
@@ -563,7 +563,10 @@ def naikturun(filter, filter22):
     #     data.groupby(["NPWP", "NAMA_WP", "TAHUNBAYAR"])["NOMINAL"].sum().reset_index()
     # )
     data = data.pivot_table(
-        index=["NPWP", "NAMA_WP"], columns="TAHUNBAYAR", values="NOMINAL", aggfunc="sum"
+        index=["NPWP15", "NAMA_WP"],
+        columns="TAHUNBAYAR",
+        values="NOMINAL",
+        aggfunc="sum",
     ).reset_index()
 
     data["SELISIH"] = data["2023"] - data["2022"]
@@ -576,13 +579,13 @@ def naikturun(filter, filter22):
 def proporsi(filter):
     kueri = f""" 
     select 
-    p."NPWP",
+    p."NPWP15",
     p."NAMA_WP" , p."JENIS_WP",
     sum(p."NOMINAL") as "NETTO",
     sum(case when p."KET" in('MPN','SPM') then p."NOMINAL" end) as "BRUTO"
     from ppmpkm p 
     where {filter}
-    group by p."NPWP" ,p."NAMA_WP"  , p."JENIS_WP"
+    group by p."NPWP15" ,p."NAMA_WP"  , p."JENIS_WP"
     order by "NETTO" desc
     """
     bruto_raw = conn.query(kueri)
@@ -592,7 +595,7 @@ def proporsi(filter):
 
     bruto = bruto_raw.drop(columns="JENIS_WP")
     bruto = (
-        bruto.groupby(["NPWP", "NAMA_WP"])
+        bruto.groupby(["NPWP15", "NAMA_WP"])
         .sum()
         .reset_index()
         .sort_values(by="NETTO", ascending=False)
@@ -1061,6 +1064,8 @@ def kluxmap(filter):
        p."KDBAYAR",
        p."TAHUNBAYAR" ,
        p."BULANBAYAR" ,
+       p."NPWP15",
+       p."NAMA_WP",
        sum(case when  p."KET" IN ('MPN', 'SPM') then p."NOMINAL" end) as "Bruto",
        sum( p."NOMINAL" )                               as "Netto"
 from ppmpkm p
@@ -1070,8 +1075,35 @@ group by p."NM_KATEGORI"::varchar,
          p."MAP",
          p."KDBAYAR",
          p."TAHUNBAYAR" ,
-         p."BULANBAYAR"
+         p."BULANBAYAR",
+         p."NPWP15",
+         p."NAMA_WP"
     """
+    data = conn.query(kueri)
+    return data
+
+
+def tren_kwl(filter):
+    kueri = f""" 
+        select
+       p."ADMIN"::varchar,
+       p."SEKSI",
+       p."NAMA_AR",
+       p."TAHUNBAYAR" ,
+       p."BULANBAYAR" ,
+       sum(case when  p."KET" IN ('MPN', 'SPM') then p."NOMINAL" end) as "Bruto",
+       sum( p."NOMINAL" )                               as "Netto"
+        from ppmpkm p 
+        where {filter} and p."SEGMENTASI_WP"='KEWILAYAHAN'
+        group by
+       p."ADMIN"::varchar,
+       p."NM_KATEGORI"::varchar,
+       p."MAP",
+       p."SEKSI",
+       p."NAMA_AR",
+       p."TAHUNBAYAR" ,
+       p."BULANBAYAR"
+"""
     data = conn.query(kueri)
     return data
 
