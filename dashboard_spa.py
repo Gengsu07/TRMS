@@ -15,6 +15,7 @@ from streamlit_toggle import st_toggle_switch
 from streamlit_option_menu import option_menu
 from math import ceil
 import string
+from mitosheet.streamlit.v1 import spreadsheet
 
 # import streamlit_authenticator as stauth
 import pygwalker as pyg
@@ -52,6 +53,8 @@ st.markdown(
 conn = st.experimental_connection("ppmpkm", type="sql")
 from scripts.db import (
     data_ket,
+    detail_wp,
+    stats_data,
     target,
     sektor,
     klu,
@@ -246,6 +249,24 @@ def n_color(df):
     return n_color
 
 
+def dataframe_selection(df):
+    df_selection = df.copy()
+    df_selection.insert(0, "Select", False)
+    edited_df = st.data_editor(
+        df_selection,
+        hide_index=True,
+        column_config={"Select": st.column_config.CheckboxColumn(required=True)},
+        disabled=df.columns,
+        use_container_width=True,
+    )
+    edited_df["Select"] = edited_df["Select"].astype(bool)
+
+    # Filter the dataframe using the temporary column, then drop the column
+    selected_rows = edited_df[edited_df["Select"] == True]
+    return selected_rows.drop("Select", axis=1)
+    # return edited_df["Select"].unique()
+
+
 def sankey_create(data_node, data_sankey, n=50, nlargest=True):
     label = ["<b>" + str(label) + "</b>" for label in data_node["label"].tolist()]
     if nlargest:
@@ -279,7 +300,7 @@ def sankey_create(data_node, data_sankey, n=50, nlargest=True):
     sankey_chart.update_layout(
         height=860,
         title=dict(
-            text=f"{n} Besar {konteks} Sebaran Sektor ke Jenis Pajak",
+            text=f"{n} Besar {konteks} <br>Sebaran Sektor ke Jenis Pajak",
             font=dict(color="#28377a", size=26),
             x=0.3,
             y=0.95,
@@ -527,25 +548,25 @@ if st.session_state["authentication_status"]:
     background_alco = "#f2f2f2"
     with colmain[0]:
         st.image("assets/unit.png", width=150)
-        switch = st_toggle_switch(
-            label="Darkmode",
-            key="switch_1",
-            default_value=False,
-            label_after=False,
-            inactive_color="#D3D3D3",  # optional
-            active_color="#11567f",  # optional
-            track_color="#29B5E8",  # optional
-        )
-        if switch:
-            with open("style/darkmode.css") as f:
-                st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-            st.session_state["darkmode"] = "on"
-            background = background
-            background_mom = "rgba(255, 255, 255, 0.95)"
-            background_alco = "rgba(0, 0, 0, 0.0)"
-            background_kpi = "#282a36"
-        else:
-            st.session_state["darkmode"] = "off"
+        # switch = st_toggle_switch(
+        #     label="Darkmode",
+        #     key="switch_1",
+        #     default_value=False,
+        #     label_after=False,
+        #     inactive_color="#D3D3D3",  # optional
+        #     active_color="#11567f",  # optional
+        #     track_color="#29B5E8",  # optional
+        # )
+        # if switch:
+        #     with open("style/darkmode.css") as f:
+        #         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+        #     st.session_state["darkmode"] = "on"
+        #     background = background
+        #     background_mom = "rgba(255, 255, 255, 0.95)"
+        #     background_alco = "rgba(0, 0, 0, 0.0)"
+        #     background_kpi = "#282a36"
+        # else:
+        #     st.session_state["darkmode"] = "off"
 
     with colmain[1]:
         st.title("Tax Revenue Monitoring Sistem🚀")
@@ -553,6 +574,7 @@ if st.session_state["authentication_status"]:
         # st.text(f" Salam Satu Bahu: {nama}")
     with colmain[2]:
         authenticator.logout("Logout", "main")
+        st.write("updated:", stats_data())
         # st.write(f"Salam Satu Bahu :{name}")
         #         access_token, id_token = authenticate.get_user_tokens(
         #             st.session_state["auth_code"]
@@ -1649,6 +1671,10 @@ if st.session_state["authentication_status"]:
                 lambda x: "Naik" if x > 0 else "Turun",
             )
 
+            sektormap["%"] = (
+                sektormap["Naik/Turun"] / sektormap["2022BulanYgSama"]
+            ) * 100
+
             top20_sankey = sektormap[["NM_KATEGORI", "MAP", "Naik/Turun"]]
             data_node = pd.DataFrame(
                 pd.concat(
@@ -1702,16 +1728,53 @@ if st.session_state["authentication_status"]:
             #     hide_index=True,
             #     height=720,
             # )
-            sektormap_check = sektormap.copy()
-            sektormap_check.insert(0, "Filter", False)
-            st.data_editor(
-                sektormap_check,
-                use_container_width=True,
-                column_config={
-                    "Filterdata": st.column_config.CheckboxColumn(required=True)
-                },
-                disabled=sektormap.columns,
-            )
+            sektormap.columns = sektormap.columns.astype(str)
+            st.write("Klik Select untuk melihat data detail")
+            selection_df = dataframe_selection(sektormap)
+            with st.expander(label="Olah Lebih Lanjut?", expanded=False):
+                spread_df, code = spreadsheet(klumap)
+            if len(selection_df) > 0:
+                selection_sektor = selection_df["NM_KATEGORI"].unique()
+                selection_map = selection_df["MAP"].unique()
+                filter_sekmap = f'{list_to_sql("NM_KATEGORI", selection_sektor)} AND {list_to_sql("MAP", selection_map)}'
+                df_detail = detail_wp(filter_sekmap)
+                df_detail_uptonow = df_detail[df_detail["BULANBAYAR"] <= maxbulan]
+                df_detail.drop(columns="BULANBAYAR", inplace=True)
+                df_detail = (
+                    pd.pivot_table(
+                        df_detail,
+                        index=["NPWP15", "NAMA_WP", "NAMA_KLU"],
+                        columns="TAHUNBAYAR",
+                        values="sum",
+                    )
+                ).reset_index()
+
+                df_detail_uptonow = (
+                    (
+                        pd.pivot_table(
+                            df_detail_uptonow[df_detail_uptonow["TAHUNBAYAR"] == 2022],
+                            index=["NPWP15", "NAMA_WP", "NAMA_KLU"],
+                            columns="TAHUNBAYAR",
+                            values="sum",
+                        )
+                    )
+                    .reset_index()
+                    .rename(columns={2022: "2022BulanYgSama"})
+                )
+                df_detail = df_detail.merge(
+                    df_detail_uptonow, on=["NPWP15", "NAMA_WP", "NAMA_KLU"], how="left"
+                )
+                # df_detail_uptonow.drop(columns=[2021])
+                df_detail["Naik/Turun"] = df_detail[2023] - df_detail["2022BulanYgSama"]
+                df_detail["Ket"] = df_detail["Naik/Turun"].apply(
+                    lambda x: "Naik" if x > 0 else "Turun"
+                )
+                df_detail["%"] = (
+                    df_detail["Naik/Turun"] / df_detail["2022BulanYgSama"]
+                ) * 100
+                st.dataframe(df_detail, use_container_width=True)
+                with st.expander(label="Olah Lebih Lanjut?", expanded=False):
+                    spread_df, code = spreadsheet(df_detail.fillna(0))
             # https://docs.streamlit.io/knowledge-base/using-streamlit/how-to-get-row-selections
 
         if submenu == "Tren Penerimaan-Kewilayahan":
@@ -1765,23 +1828,127 @@ if st.session_state["authentication_status"]:
                 },
             )
             st.plotly_chart(line_fig, use_container_width=True)
-            data_kwl_2023 = data_kwl[data_kwl["TAHUNBAYAR"] == 2023]
+
+            # =============================================================
             data_kwl_2022 = data_kwl[data_kwl["TAHUNBAYAR"] == 2022]
-            data_kwl_2022uptonow = data_kwl_2022[
-                data_kwl_2022["BULANBAYAR"] == data_kwl_2023["BULANBAYAR"].max()
+            maxbulan = data_kwl_2022["BULANBAYAR"].max()
+            data_kwl_2022_uptonow = data_kwl_2022[
+                data_kwl_2022["BULANBAYAR"] <= maxbulan
             ]
 
-            data_kwl = pd.pivot_table(
+            data_kwl_pv = pd.pivot_table(
                 data_kwl,
                 index=["ADMIN", "SEKSI", "NAMA_AR"],
                 columns="TAHUNBAYAR",
                 values="Bruto",
                 aggfunc="sum",
+            ).reset_index()
+            data_kwl_pv_uptonow = (
+                pd.pivot_table(
+                    data_kwl_2022_uptonow,
+                    index=["ADMIN", "SEKSI", "NAMA_AR"],
+                    columns="TAHUNBAYAR",
+                    values="Bruto",
+                    aggfunc="sum",
+                )
+                .reset_index()
+                .rename(columns={2022: "2022BulanYgSama"})
             )
-            data_kwl = data_kwl.reset_index()
 
-            # data_kwl['Rank AR']
-            st.dataframe(data_kwl)
+            data_kwl_pv = data_kwl_pv.merge(
+                data_kwl_pv_uptonow, on=["ADMIN", "SEKSI", "NAMA_AR"], how="left"
+            )
+            data_kwl_pv["Naik/Turun"] = (
+                data_kwl_pv[2023] - data_kwl_pv["2022BulanYgSama"]
+            )
+            data_kwl_pv["Ket"] = data_kwl_pv["Naik/Turun"].apply(
+                lambda x: "Naik" if x > 0 else "Turun"
+            )
+            data_kwl_pv["%"] = (
+                data_kwl_pv["Naik/Turun"] / data_kwl_pv["2022BulanYgSama"]
+            ) * 100
+
+            # ====================================================================
+            adm_df = (
+                data_kwl.groupby(["ADMIN", "TAHUNBAYAR"])["Bruto"].sum().reset_index()
+            )
+
+            adm_df = adm_df[~adm_df["ADMIN"].isin(["007", "097"])]
+            adm_df["text"] = adm_df["Bruto"].apply(lambda x: format_angka(x))
+            adm_df["TAHUNBAYAR"] = adm_df["TAHUNBAYAR"].astype("str")
+            adm_chart = px.bar(
+                data_frame=adm_df,
+                x="ADMIN",
+                y="Bruto",
+                color="TAHUNBAYAR",
+                text="text",
+                height=380,
+                barmode="stack",
+                color_discrete_sequence=["#ffca19", "#02275d", "#29a174"],
+                # custom_data=["TAHUNBAYAR"],
+            )
+
+            # hovertemplate = (
+            #     "<b>%{x}</b><br><br>"
+            #     + "NOMINAL: %{text} <br>"
+            #     + "TAHUNBAYAR: %{customdata[0]} <extra></extra>"
+            # )
+            # linechart.update_traces(hovertemplate=hovertemplate)
+            adm_chart.update_layout(
+                xaxis_title="",
+                yaxis_title="",
+                yaxis={"visible": False},
+                paper_bgcolor=background,
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                autosize=True,
+            )
+            st.plotly_chart(adm_chart, use_container_width=True)
+            # ============================================
+            st.write("Klik Select untuk lihat data detail")
+            selection_df = dataframe_selection(data_kwl_pv)
+            with st.expander(label="Olah Lebih Lanjut?", expanded=False):
+                spread_df, code = spreadsheet(data_kwl.fillna(0), data_kwl_pv)
+            if len(selection_df) > 0:
+                selection_adm = selection_df["ADMIN"].unique()
+                selection_ar = selection_df["NAMA_AR"].unique()
+                filter_adm_seksi = f'{list_to_sql("ADMIN", selection_adm)} AND {list_to_sql("NAMA_AR", selection_ar)}'
+                df_det = detail_wp(filter_adm_seksi)
+                df_detail_uptonow = df_det[df_det["BULANBAYAR"] <= maxbulan]
+                df_detail = (
+                    pd.pivot_table(
+                        df_det,
+                        index=["NPWP15", "NAMA_WP", "NAMA_KLU"],
+                        columns="TAHUNBAYAR",
+                        values="sum",
+                        aggfunc="sum",
+                    )
+                ).reset_index()
+                df_detail_uptonow = (
+                    (
+                        pd.pivot_table(
+                            df_detail_uptonow[df_detail_uptonow["TAHUNBAYAR"] == 2022],
+                            index=["NPWP15", "NAMA_WP", "NAMA_KLU"],
+                            columns="TAHUNBAYAR",
+                            values="sum",
+                            aggfunc="sum",
+                        )
+                    )
+                    .reset_index()
+                    .rename(columns={2022: "2022BulanYgSama"})
+                )
+                df_detail = df_detail.merge(
+                    df_detail_uptonow, on=["NPWP15", "NAMA_WP", "NAMA_KLU"], how="left"
+                )
+                df_detail["Naik/Turun"] = df_detail[2023] - df_detail["2022BulanYgSama"]
+                df_detail["Ket"] = df_detail["Naik/Turun"].apply(
+                    lambda x: "Naik" if x > 0 else "Turun"
+                )
+                df_detail["%"] = (
+                    df_detail["Naik/Turun"] - df_detail["2022BulanYgSama"]
+                ) * 100
+                st.dataframe(df_detail, use_container_width=True, hide_index=True)
+                with st.expander(label="Olah Lebih Lanjut?", expanded=False):
+                    spread_df, code = spreadsheet(df_det)
 
     elif tabs == "SelfAnalytics":
         st.subheader("Self Service Explore, Analisa, dan Membuat Chart Mandiri")

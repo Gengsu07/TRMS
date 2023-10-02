@@ -1108,6 +1108,22 @@ def tren_kwl(filter):
     return data
 
 
+def detail_wp(filter_sekmap):
+    kueri = f"""select
+    p."NPWP15", p."NAMA_WP",p."TAHUNBAYAR",p."NAMA_KLU",p."BULANBAYAR",sum(p."NOMINAL")
+    from ppmpkm p
+    where p."TAHUNBAYAR" >=2021 and "NPWP15" not like '000000000%' and p."KET" in ('MPN','SPM')
+    and {filter_sekmap}
+    group by p."NPWP15",p."NAMA_WP",p."TAHUNBAYAR",p."NAMA_KLU",p."BULANBAYAR" """
+    data = conn.query(kueri)
+    return data
+
+
+def stats_data():
+    lastUpdate = conn.query('select max(p."DATEBAYAR") from ppmpkm p')
+    return lastUpdate.iloc[0, 0]
+
+
 if __name__ == "__main__":
     filter = """"DATEBAYAR">='2023-01-01' and"DATEBAYAR"<='2023-06-25' and"ADMIN" IN ('007') """
     filter22 = """ "DATEBAYAR">='2022-01-01' and"DATEBAYAR"<='2022-06-25' and"ADMIN" IN ('007') """

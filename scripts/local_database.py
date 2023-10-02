@@ -1,10 +1,17 @@
 import streamlit_authenticator as stauth
 import pandas as pd
 import sqlite3
+import psycopg2
+from urllib.parse import quote_plus
+
+password = quote_plus("kwl@110")
+postgre_con = "postgres://oc:{}@10.20.254.228/penerimaan".format(password)
+pg_conn = psycopg2.connect(postgre_con)
+cur = pg_conn.cursor()
 
 conn_sqlite = sqlite3.connect("login.db")
 c = conn_sqlite.cursor()
-url_data = r"C:\Users\sugengw07\OneDrive - Kemenkeu\KANWILJAKTIM\DATA\pegawai110.xlsx"
+url_data = r"D:\DATA\adduser.xlsx"
 
 
 def read_data(url_data):
@@ -23,11 +30,11 @@ def read_data(url_data):
 
 
 def insert_user(username, name, hash_password, adm):
-    c.execute(
-        "INSERT INTO users(username, name, password, adm) VALUES(?,?,?,?)",
+    cur.execute(
+        "INSERT INTO trms.users(username, name, password, adm) VALUES(%s,%s,%s,%s)",
         (username, name, hash_password, adm),
     )
-    conn_sqlite.commit()
+    pg_conn.commit()
 
 
 def create_table():
