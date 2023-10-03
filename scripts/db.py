@@ -1083,6 +1083,30 @@ group by p."NM_KATEGORI"::varchar,
     return data
 
 
+def klu_rank(filter_date, filter_date22):
+    kueri = f""" 
+    SELECT 
+    p."NAMA_KLU" ,
+    sum(CASE WHEN p."TAHUNBAYAR" = date_part('year', current_date) THEN p."NOMINAL" END )"CY" ,
+    sum(CASE WHEN p."TAHUNBAYAR" = (date_part('year', current_date)-1) THEN p."NOMINAL" END )"PY"
+    FROM ppmpkm p 
+    WHERE  p."KET" IN('MPN','SPM')
+    AND (
+            {filter_date}
+        )
+        or (
+            {filter_date22}
+            )
+        
+    GROUP BY p."NAMA_KLU" 
+"""
+    data = conn.query(kueri)
+    data["Naik/Turun"] = data["CY"] - data["PY"]
+    data["%"] = round((data["Naik/Turun"] / data["PY"]) * 100, 2)
+    data.sort_values(by="Naik/Turun", ascending=False, inplace=True)
+    return data
+
+
 def tren_kwl(filter):
     kueri = f""" 
         select

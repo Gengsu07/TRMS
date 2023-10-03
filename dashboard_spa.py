@@ -79,6 +79,7 @@ from scripts.db import (
     fetch_all,
     kluxmap,
     tren_kwl,
+    klu_rank,
 )
 from scripts.aggrid import aggrid
 import scripts.database as db
@@ -298,12 +299,12 @@ def sankey_create(data_node, data_sankey, n=50, nlargest=True):
         ]
     )
     sankey_chart.update_layout(
-        height=860,
+        height=720,
         title=dict(
             text=f"{n} Besar {konteks} <br>Sebaran Sektor ke Jenis Pajak",
             font=dict(color="#28377a", size=26),
-            x=0.3,
-            y=0.95,
+            x=0.2,
+            # y=0.95,
         ),
         paper_bgcolor=background,
         plot_bgcolor="#ECF9FF",
@@ -1597,6 +1598,9 @@ if st.session_state["authentication_status"]:
             start, end, kpp, map, sektor, segmen, wp = filter_ui(adm, timeseries=True)
             filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
             filter = "and".join(x for x in filter_gabungan[0])
+            filter_date = "and".join(x for x in filter_gabungan[0][:2])
+            filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
+
             klumap = kluxmap(filter)
 
             col1, col2, col3 = st.columns(3)
@@ -1627,6 +1631,8 @@ if st.session_state["authentication_status"]:
                 markers=True,
             )
             line_fig.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
                 xaxis_title="",
                 yaxis_title="",
                 yaxis={"visible": False},
@@ -1636,9 +1642,10 @@ if st.session_state["authentication_status"]:
                     "ticktext": [calendar.month_name[i] for i in range(1, 13)],
                     # "tickfont": {"color": "#fff"},
                 },
+                title=dict(text="Tren Penerimaan Pajak Bruto Per Bulan", x=0.5),
             )
             st.plotly_chart(line_fig, use_container_width=True)
-
+            # ======================================================
             klumap_2023 = klumap[klumap["TAHUNBAYAR"] == 2023]
             maxbulan = klumap_2023["BULANBAYAR"].max()
             klumap_2022 = klumap[klumap["TAHUNBAYAR"] == 2022]
@@ -1722,12 +1729,112 @@ if st.session_state["authentication_status"]:
                 st.plotly_chart(sankey_top, use_container_width=True)
             with colbot:
                 st.plotly_chart(sankey_bottom, use_container_width=True)
-            # st.dataframe(
-            #     sektormap.sort_values(by=2022, ascending=False),
-            #     use_container_width=True,
-            #     hide_index=True,
-            #     height=720,
-            # )
+            # ================================================
+            # bar
+            klu_rank = klu_rank(filter_date, filter_date22)
+            klu_rank["KLU_cutted"] = klu_rank["NAMA_KLU"].str[:30] + "..."
+            barklu_persen = px.bar(
+                klu_rank.nlargest(10, "%").sort_values(by="%", ascending=True),
+                x="%",
+                y="KLU_cutted",
+                orientation="h",
+                text="%",
+                height=640,
+                title="10 Besar Persentase Tumbuh",
+            )
+            barklu_persen.update_traces(texttemplate="%{x:,.0f}%", textposition="auto")
+            barklu_persen.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                xaxis={"visible": False},
+                title=dict(x=0.5),
+            )
+
+            barklu_nominal = px.bar(
+                (
+                    klu_rank.nlargest(10, "Naik/Turun").sort_values(
+                        by="Naik/Turun", ascending=True
+                    )
+                ).assign(Milyar=klu_rank["Naik/Turun"] / 1000000000),
+                x="Milyar",
+                y="KLU_cutted",
+                orientation="h",
+                text="Naik/Turun",
+                height=640,
+                title="10 Besar Nominal Tumbuh",
+            )
+            barklu_nominal.update_traces(texttemplate="%{x:,.1f}M", textposition="auto")
+            barklu_nominal.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                xaxis={"visible": False},
+                title=dict(x=0.5),
+            )
+            colbarklu_naik = st.columns(2)
+            with colbarklu_naik[0]:
+                st.plotly_chart(barklu_persen, use_container_width=True)
+            with colbarklu_naik[1]:
+                st.plotly_chart(barklu_nominal, use_container_width=True)
+            with st.expander(label="Detail Data"):
+                st.dataframe(klu_rank)
+            # ====================================================================
+            mapdf = sektormap.groupby(["MAP"])[[2022, "Naik/Turun"]].sum().reset_index()
+            mapdf["%"] = round((mapdf["Naik/Turun"] / mapdf[2022]) * 100, 2)
+            mapdf["%"] = mapdf["%"].apply(lambda x: 1 if x == np.inf else x)
+
+            barmap_persen = px.bar(
+                mapdf.nlargest(10, "%").sort_values(by="%", ascending=True),
+                x="%",
+                y="MAP",
+                orientation="h",
+                text="%",
+                height=640,
+                title="10 Besar Persentase Tumbuh",
+            )
+            barmap_persen.update_traces(texttemplate="%{x:,.0f}%", textposition="auto")
+            barmap_persen.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                xaxis={"visible": False},
+                title=dict(x=0.5),
+            )
+
+            barmap_nominal = px.bar(
+                (
+                    mapdf.nlargest(10, "Naik/Turun").sort_values(
+                        by="Naik/Turun", ascending=True
+                    )
+                ).assign(Milyar=mapdf["Naik/Turun"] / 1000000000),
+                x="Milyar",
+                y="MAP",
+                orientation="h",
+                text="Naik/Turun",
+                height=640,
+                title="10 Besar Nominal Tumbuh",
+            )
+            barmap_nominal.update_traces(texttemplate="%{x:,.1f}M", textposition="auto")
+            barmap_nominal.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                xaxis={"visible": False},
+                title=dict(x=0.5),
+            )
+            colbarklu_naik = st.columns(2)
+            with colbarklu_naik[0]:
+                st.plotly_chart(barmap_persen, use_container_width=True)
+            with colbarklu_naik[1]:
+                st.plotly_chart(barmap_nominal, use_container_width=True)
+            with st.expander(label="Detail Data"):
+                st.dataframe(mapdf)
+            # ====================================================================
             sektormap.columns = sektormap.columns.astype(str)
             st.write("Klik Select untuk melihat data detail")
             selection_df = dataframe_selection(sektormap)
