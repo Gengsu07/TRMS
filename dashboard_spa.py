@@ -54,6 +54,7 @@ conn = st.experimental_connection("ppmpkm", type="sql")
 from scripts.db import (
     data_ket,
     detail_wp,
+    detail_wp_kwl,
     stats_data,
     target,
     sektor,
@@ -1600,6 +1601,7 @@ if st.session_state["authentication_status"]:
             filter = "and".join(x for x in filter_gabungan[0])
             filter_date = "and".join(x for x in filter_gabungan[0][:2])
             filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
+            filter_cat = "and".join(x for x in filter_gabungan[1][2:])
 
             klumap = kluxmap(filter)
 
@@ -1731,7 +1733,8 @@ if st.session_state["authentication_status"]:
                 st.plotly_chart(sankey_bottom, use_container_width=True)
             # ================================================
             # bar
-            klu_rank = klu_rank(filter_date, filter_date22)
+            st.write(filter_cat)
+            klu_rank = klu_rank(filter_date, filter_date22, filter_cat)
             klu_rank["KLU_cutted"] = klu_rank["NAMA_KLU"].str[:30] + "..."
             barklu_persen = px.bar(
                 klu_rank.nlargest(10, "%").sort_values(by="%", ascending=True),
@@ -1780,7 +1783,7 @@ if st.session_state["authentication_status"]:
             with colbarklu_naik[1]:
                 st.plotly_chart(barklu_nominal, use_container_width=True)
             with st.expander(label="Detail Data"):
-                st.dataframe(klu_rank)
+                st.dataframe(klu_rank, use_container_width=True, hide_index=True)
             # ====================================================================
             mapdf = sektormap.groupby(["MAP"])[[2022, "Naik/Turun"]].sum().reset_index()
             mapdf["%"] = round((mapdf["Naik/Turun"] / mapdf[2022]) * 100, 2)
@@ -1833,7 +1836,7 @@ if st.session_state["authentication_status"]:
             with colbarklu_naik[1]:
                 st.plotly_chart(barmap_nominal, use_container_width=True)
             with st.expander(label="Detail Data"):
-                st.dataframe(mapdf)
+                st.dataframe(mapdf, use_container_width=True, hide_index=True)
             # ====================================================================
             sektormap.columns = sektormap.columns.astype(str)
             st.write("Klik Select untuk melihat data detail")
@@ -1843,7 +1846,10 @@ if st.session_state["authentication_status"]:
             if len(selection_df) > 0:
                 selection_sektor = selection_df["NM_KATEGORI"].unique()
                 selection_map = selection_df["MAP"].unique()
-                filter_sekmap = f'{list_to_sql("NM_KATEGORI", selection_sektor)} AND {list_to_sql("MAP", selection_map)}'
+                if filter_cat:
+                    filter_sekmap = f'{list_to_sql("NM_KATEGORI", selection_sektor)} AND {list_to_sql("MAP", selection_map)} AND {filter_cat}'
+                else:
+                    filter_sekmap = f'{list_to_sql("NM_KATEGORI", selection_sektor)} AND {list_to_sql("MAP", selection_map)}'
                 df_detail = detail_wp(filter_sekmap)
                 df_detail_uptonow = df_detail[df_detail["BULANBAYAR"] <= maxbulan]
                 df_detail.drop(columns="BULANBAYAR", inplace=True)
@@ -1879,7 +1885,7 @@ if st.session_state["authentication_status"]:
                 df_detail["%"] = (
                     df_detail["Naik/Turun"] / df_detail["2022BulanYgSama"]
                 ) * 100
-                st.dataframe(df_detail, use_container_width=True)
+                st.dataframe(df_detail, use_container_width=True, hide_index=True)
                 with st.expander(label="Olah Lebih Lanjut?", expanded=False):
                     spread_df, code = spreadsheet(df_detail.fillna(0))
             # https://docs.streamlit.io/knowledge-base/using-streamlit/how-to-get-row-selections
@@ -1889,6 +1895,8 @@ if st.session_state["authentication_status"]:
             start, end, kpp, map, sektor = filter_ui_kwl(adm, timeseries=True)
             filter_gabungan = cek_filter(start, end, kpp, map, sektor)
             filter = "and".join(x for x in filter_gabungan[0])
+            filter_date = "and".join(x for x in filter_gabungan[0][:2])
+            filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
             data_kwl = tren_kwl(filter)
             tren_kwl = (
                 data_kwl[["TAHUNBAYAR", "BULANBAYAR", "Bruto"]]
@@ -1935,7 +1943,18 @@ if st.session_state["authentication_status"]:
                 },
             )
             st.plotly_chart(line_fig, use_container_width=True)
-
+            with st.expander(label="Detail Data"):
+                st.dataframe(
+                    pd.pivot_table(
+                        data=tren_kwl,
+                        index=["BULANBAYAR"],
+                        columns="TAHUNBAYAR",
+                        values="Bruto",
+                        aggfunc="sum",
+                    ).reset_index(),
+                    use_container_width=True,
+                    hide_index=True,
+                )
             # =============================================================
             data_kwl_2022 = data_kwl[data_kwl["TAHUNBAYAR"] == 2022]
             maxbulan = data_kwl_2022["BULANBAYAR"].max()
@@ -1990,17 +2009,11 @@ if st.session_state["authentication_status"]:
                 color="TAHUNBAYAR",
                 text="text",
                 height=380,
-                barmode="stack",
+                barmode="group",
                 color_discrete_sequence=["#ffca19", "#02275d", "#29a174"],
                 # custom_data=["TAHUNBAYAR"],
             )
 
-            # hovertemplate = (
-            #     "<b>%{x}</b><br><br>"
-            #     + "NOMINAL: %{text} <br>"
-            #     + "TAHUNBAYAR: %{customdata[0]} <extra></extra>"
-            # )
-            # linechart.update_traces(hovertemplate=hovertemplate)
             adm_chart.update_layout(
                 xaxis_title="",
                 yaxis_title="",
@@ -2010,6 +2023,57 @@ if st.session_state["authentication_status"]:
                 autosize=True,
             )
             st.plotly_chart(adm_chart, use_container_width=True)
+            # =====================================================
+            topwp_kwl = detail_wp_kwl(filter_date, filter_date22)
+            topwp_kwl["%"] = topwp_kwl["%"].apply(lambda x: 1 if x == np.inf else x)
+            barwil_persen = px.bar(
+                topwp_kwl.nlargest(10, "%").sort_values(by="%", ascending=True),
+                x="%",
+                y="NAMA_WP",
+                orientation="h",
+                text="%",
+                height=640,
+                title="10 Besar Persentase Tumbuh",
+            )
+            barwil_persen.update_traces(texttemplate="%{x:,.0f}%", textposition="auto")
+            barwil_persen.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                xaxis={"visible": False},
+                title=dict(x=0.5),
+            )
+
+            barwil_nominal = px.bar(
+                (
+                    topwp_kwl.nlargest(10, "Naik/Turun").sort_values(
+                        by="Naik/Turun", ascending=True
+                    )
+                ).assign(Milyar=topwp_kwl["Naik/Turun"] / 1000000000),
+                x="Milyar",
+                y="NAMA_WP",
+                orientation="h",
+                text="Naik/Turun",
+                height=640,
+                title="10 Besar Nominal Tumbuh",
+            )
+            barwil_nominal.update_traces(texttemplate="%{x:,.1f}M", textposition="auto")
+            barwil_nominal.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                xaxis={"visible": False},
+                title=dict(x=0.5),
+            )
+            colbarklu_naik = st.columns(2)
+            with colbarklu_naik[0]:
+                st.plotly_chart(barwil_persen, use_container_width=True)
+            with colbarklu_naik[1]:
+                st.plotly_chart(barwil_nominal, use_container_width=True)
+            with st.expander(label="Detail Data"):
+                st.dataframe(topwp_kwl, use_container_width=True, hide_index=True)
             # ============================================
             st.write("Klik Select untuk lihat data detail")
             selection_df = dataframe_selection(data_kwl_pv)
