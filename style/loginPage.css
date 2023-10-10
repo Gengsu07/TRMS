@@ -1,0 +1,17 @@
+[data-testid="stHeader"]{
+    display: none;
+}
+
+[data-testid="stAppViewContainer"] {
+    background-color: #181818;
+}
+
+[data-testid="stHorizontalBlock"]{
+    background: #3d3d3d;     
+    margin: 5rem 10rem;
+    padding: 3rem;
+    border-radius: 15px;
+    
+}
+
+[data-testid="column"]:nth-child(1)

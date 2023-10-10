@@ -15,6 +15,7 @@ from streamlit_toggle import st_toggle_switch
 from streamlit_option_menu import option_menu
 from math import ceil
 import string
+from mitosheet.streamlit.v1 import spreadsheet
 
 # import streamlit_authenticator as stauth
 import pygwalker as pyg
@@ -23,20 +24,38 @@ from components import streamlit_authenticator as stauth
 import st_aggrid as st_ag
 from st_aggrid import AgGrid
 from st_aggrid.grid_options_builder import GridOptionsBuilder
-import sqlite3
+import numpy as np
 
-conn_sqlite = sqlite3.connect("login.db")
-c = conn_sqlite.cursor()
+
+# conn_sqlite = sqlite3.connect("login.db")
+# c = conn_sqlite.cursor()
 
 
 st.set_page_config(
     page_title="Tax Revenue Monitoring Sistem",
-    page_icon="assets\logo_djo.png",
+    page_icon="assets/logo_djo.png",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+st.markdown(
+    """
+        <style>
+               .block-container {
+                    padding-top: 0rem;
+                    padding-bottom: 0rem;
+                    padding-left: 1rem;
+                    padding-right: 1rem;
+                }
+        </style>
+        """,
+    unsafe_allow_html=True,
+)
+conn = st.experimental_connection("ppmpkm", type="sql")
 from scripts.db import (
     data_ket,
+    detail_wp,
+    detail_wp_kwl,
+    stats_data,
     target,
     sektor,
     klu,
@@ -59,6 +78,9 @@ from scripts.db import (
     explore_data,
     map_mom,
     fetch_all,
+    kluxmap,
+    tren_kwl,
+    klu_rank,
 )
 from scripts.aggrid import aggrid
 import scripts.database as db
@@ -66,9 +88,10 @@ from scripts.filter_dataframe import filter_dataframe
 
 # settings
 
-with open("style/style.css") as f:
+# with open("style/style.css") as f:
+#     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+with open("style/loginPage.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
 
 conn = st.experimental_connection("ppmpkm", type="sql")
 
@@ -111,12 +134,12 @@ def login(self, form_name: str, location: str = "main") -> tuple:
 
         if location == "main":
             if not st.session_state["authentication_status"]:
-                with open("style/home.css") as f:
-                    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+                # with open("style/home.css") as f:
+                #     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
                 col_login = st.columns([60, 120])
                 with col_login[0]:
                     st.image(
-                        "assets/login_img.jpg",
+                        "assets/login.png",
                         use_column_width=True,
                     )
 
@@ -177,9 +200,8 @@ def logout(self, button_name: str, location: str = "main", key: str = None):
 
 
 def get_adm(username):
-    c.execute(f"SELECT adm from users where username={username}")
-    data = c.fetchall()
-    return data
+    data = conn.query(f"SELECT adm from users where username='{username}' ")
+    return data.iloc[0, 0]
 
 
 def user_dict():
@@ -230,6 +252,68 @@ def n_color(df):
     return n_color
 
 
+def dataframe_selection(df):
+    df_selection = df.copy()
+    df_selection.insert(0, "Select", False)
+    edited_df = st.data_editor(
+        df_selection,
+        hide_index=True,
+        column_config={"Select": st.column_config.CheckboxColumn(required=True)},
+        disabled=df.columns,
+        use_container_width=True,
+    )
+    edited_df["Select"] = edited_df["Select"].astype(bool)
+
+    # Filter the dataframe using the temporary column, then drop the column
+    selected_rows = edited_df[edited_df["Select"] == True]
+    return selected_rows.drop("Select", axis=1)
+    # return edited_df["Select"].unique()
+
+
+def sankey_create(data_node, data_sankey, n=50, nlargest=True):
+    label = ["<b>" + str(label) + "</b>" for label in data_node["label"].tolist()]
+    if nlargest:
+        data_sankey = data_sankey.nlargest(n, columns="value")
+        konteks = "Kenaikan"
+    else:
+        data_sankey = data_sankey.nsmallest(n, columns="value")
+        data_sankey["value"] = data_sankey["value"] * -1
+        konteks = "Penurunan"
+
+    sankey_chart = go.Figure(
+        data=[
+            go.Sankey(
+                node=dict(
+                    pad=15,
+                    thickness=20,
+                    line=dict(color="blue", width=0.5),
+                    label=label,
+                    color=n_color(data_sankey),
+                ),
+                link=dict(
+                    source=data_sankey["source"],
+                    target=data_sankey["target"],
+                    value=data_sankey["value"],
+                    color=n_color(data_sankey),
+                ),
+                valueformat=".2s",
+            )
+        ]
+    )
+    sankey_chart.update_layout(
+        height=720,
+        title=dict(
+            text=f"{n} Besar {konteks} <br>Sebaran Sektor ke Jenis Pajak",
+            font=dict(color="#28377a", size=26),
+            x=0.2,
+            # y=0.95,
+        ),
+        paper_bgcolor=background,
+        plot_bgcolor="#ECF9FF",
+    )
+    return sankey_chart
+
+
 @st.cache_resource
 def list_to_sql(column, value):
     value_str = ",".join([f"'{x}'" for x in value])
@@ -238,7 +322,7 @@ def list_to_sql(column, value):
 
 
 @st.cache_resource
-def cek_filter(start, end, kpp, map, sektor, segmen, wp):
+def cek_filter(start, end, kpp, map, sektor, segmen="", wp=""):
     filter_gabungan = []
     filter_gabungan22 = []
     if start:
@@ -276,7 +360,7 @@ def cek_filter(start, end, kpp, map, sektor, segmen, wp):
     return [filter_gabungan, filter_gabungan22]
 
 
-def filter_ui(adm):
+def filter_ui(adm, timeseries=False):
     adm_str = f"'{adm}'"
     col_filter = st.columns([1, 1, 1, 2, 2, 2, 2])
     if adm != "110":
@@ -284,9 +368,14 @@ def filter_ui(adm):
     else:
         filter_kpp = None
 
+    if timeseries:
+        datestart = "2021-01-01"
+    else:
+        datestart = "2023-01-01"
+
     if filter_kpp != None:
         with col_filter[0]:
-            mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
+            mindate = datetime.strptime(f"{datestart}", "%Y-%m-%d")
             start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
         with col_filter[1]:
             end = st.date_input("Tgl Akhir", max_value=date.today())
@@ -319,7 +408,7 @@ def filter_ui(adm):
             wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
     else:
         with col_filter[0]:
-            mindate = datetime.strptime("2023-01-01", "%Y-%m-%d")
+            mindate = datetime.strptime(f"{datestart}", "%Y-%m-%d")
             start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
         with col_filter[1]:
             end = st.date_input("Tgl Akhir", max_value=date.today())
@@ -350,6 +439,63 @@ def filter_ui(adm):
             wp = st.multiselect("Wajib Pajak", wp["NAMA_WP"].tolist())
 
     return [start, end, kpp, map, sektor, segmen, wp]
+
+
+def filter_ui_kwl(adm, timeseries=False):
+    adm_str = f"'{adm}'"
+    col_filter = st.columns([1, 1, 1, 2, 2])
+    if adm != "110":
+        filter_kpp = adm_str
+    else:
+        filter_kpp = None
+
+    if timeseries:
+        datestart = "2021-01-01"
+    else:
+        datestart = "2023-01-01"
+
+    if filter_kpp != None:
+        with col_filter[0]:
+            mindate = datetime.strptime(f"{datestart}", "%Y-%m-%d")
+            start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
+        with col_filter[1]:
+            end = st.date_input("Tgl Akhir", max_value=date.today())
+        with col_filter[2]:
+            kpp = conn.query(
+                f'select distinct "ADMIN" from ppmpkm where "ADMIN" notnull and "ADMIN"={filter_kpp}'
+            )
+            kpp = st.multiselect("KPP", options=kpp.iloc[:, 0].tolist(), default=[adm])
+        with col_filter[3]:
+            map = conn.query(
+                f'select distinct "MAP" from ppmpkm where "MAP" notnull and "ADMIN"={filter_kpp}'
+            )
+            map = st.multiselect("MAP", options=map.iloc[:, 0].tolist())
+        with col_filter[4]:
+            sektor = conn.query(
+                f'select distinct "NM_KATEGORI" from ppmpkm where "NM_KATEGORI" notnull and "ADMIN"={filter_kpp}'
+            )
+            sektor = st.multiselect("SEKTOR", options=sektor.iloc[:, 0].tolist())
+
+    else:
+        with col_filter[0]:
+            mindate = datetime.strptime(f"{datestart}", "%Y-%m-%d")
+            start = st.date_input("Tgl Mulai", min_value=mindate, value=mindate)
+        with col_filter[1]:
+            end = st.date_input("Tgl Akhir", max_value=date.today())
+        with col_filter[2]:
+            kpp = conn.query(
+                'select distinct "ADMIN" from ppmpkm where "ADMIN" notnull'
+            )
+            kpp = st.multiselect("KPP", options=kpp.iloc[:, 0].tolist())
+        with col_filter[3]:
+            map = conn.query('select distinct "MAP" from ppmpkm where "MAP" notnull')
+            map = st.multiselect("MAP", options=map.iloc[:, 0].tolist())
+        with col_filter[4]:
+            sektor = conn.query(
+                'select distinct "NM_KATEGORI" from ppmpkm where "NM_KATEGORI" notnull'
+            )
+            sektor = st.multiselect("SEKTOR", options=sektor.iloc[:, 0].tolist())
+    return [start, end, kpp, map, sektor]
 
 
 def tumbuh_zerodev(x, y):
@@ -400,6 +546,45 @@ authenticator = stauth.Authenticate(
 name, authentication_status, username = authenticator.login("Login-TRMS", "main")
 
 if st.session_state["authentication_status"]:
+    colmain = st.columns([1, 4, 1])
+    background = "rgba(255, 255, 255, 1.0)"
+    background_alco = "#f2f2f2"
+    with colmain[0]:
+        st.image("assets/unit.png", width=150)
+        # switch = st_toggle_switch(
+        #     label="Darkmode",
+        #     key="switch_1",
+        #     default_value=False,
+        #     label_after=False,
+        #     inactive_color="#D3D3D3",  # optional
+        #     active_color="#11567f",  # optional
+        #     track_color="#29B5E8",  # optional
+        # )
+        # if switch:
+        #     with open("style/darkmode.css") as f:
+        #         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+        #     st.session_state["darkmode"] = "on"
+        #     background = background
+        #     background_mom = "rgba(255, 255, 255, 0.95)"
+        #     background_alco = "rgba(0, 0, 0, 0.0)"
+        #     background_kpi = "#282a36"
+        # else:
+        #     st.session_state["darkmode"] = "off"
+
+    with colmain[1]:
+        st.title("Tax Revenue Monitoring Sistem🚀")
+
+        # st.text(f" Salam Satu Bahu: {nama}")
+    with colmain[2]:
+        authenticator.logout("Logout", "main")
+        st.write("updated:", stats_data())
+        # st.write(f"Salam Satu Bahu :{name}")
+        #         access_token, id_token = authenticate.get_user_tokens(
+        #             st.session_state["auth_code"]
+        #         )
+        # st.write(st.session_state["authenticated"])
+
+    # Goto Filter button
     st.markdown(
         """
     <a href="#tax-revenue-monitoring-sistem" onclick="document.getElementById('cek').scrollIntoView(); return false;" class="floating-button">Filter Data</a>
@@ -408,7 +593,7 @@ if st.session_state["authentication_status"]:
     )
     tabs = option_menu(
         None,
-        ["Dashboard", "ALCo", "SelfAnalytics"],
+        ["Dashboard", "ALCo", "Report", "SelfAnalytics"],
         icons=["bi bi-speedometer", "bi bi-bar-chart", "bi bi-messenger"],
         menu_icon="cast",
         default_index=0,
@@ -435,45 +620,8 @@ if st.session_state["authentication_status"]:
         },
     )
 
-    colmain = st.columns([1, 4, 1])
-    background = "rgba(255, 255, 255, 1.0)"
-    background_alco = "#f2f2f2"
-    with colmain[0]:
-        st.image("assets/unit.png", width=150)
-        switch = st_toggle_switch(
-            label="Darkmode",
-            key="switch_1",
-            default_value=False,
-            label_after=False,
-            inactive_color="#D3D3D3",  # optional
-            active_color="#11567f",  # optional
-            track_color="#29B5E8",  # optional
-        )
-        if switch:
-            with open("style/darkmode.css") as f:
-                st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-            st.session_state["darkmode"] = "on"
-            background = background
-            background_mom = "rgba(255, 255, 255, 0.95)"
-            background_alco = "rgba(0, 0, 0, 0.0)"
-            background_kpi = "#282a36"
-        else:
-            st.session_state["darkmode"] = "off"
-
-    with colmain[1]:
-        st.title("Tax Revenue Monitoring Sistem🚀")
-
-        # st.text(f" Salam Satu Bahu: {nama}")
-    with colmain[2]:
-        authenticator.logout("Logout", "main")
-        # st.write(f"Salam Satu Bahu :{name}")
-        #         access_token, id_token = authenticate.get_user_tokens(
-        #             st.session_state["auth_code"]
-        #         )
-        # st.write(st.session_state["authenticated"])
     if tabs == "Dashboard":
-        adm = get_adm(st.session_state["username"])[0]
-        adm = adm[0]
+        adm = get_adm(st.session_state["username"])
 
         start, end, kpp, map, sektor, segmen, wp = filter_ui(adm)
 
@@ -484,6 +632,7 @@ if st.session_state["authentication_status"]:
         filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
         filter_cat = "and".join(x for x in filter_gabungan[1][2:])
         filter22 = "and".join(x for x in filter_gabungan[1])
+
         # KPI-----------------------------------------------------------------------------------
         style_metric_cards(
             background_color=background_kpi,
@@ -730,37 +879,11 @@ if st.session_state["authentication_status"]:
         # ----------------------------------------------------------------------------------------------
         data_sankey, data_node = data_sankey(filter)
 
-        label = ["<b>" + str(label) + "</b>" for label in data_node["label"].tolist()]
-        sankey_chart = go.Figure(
-            data=[
-                go.Sankey(
-                    node=dict(
-                        pad=15,
-                        thickness=20,
-                        line=dict(color="blue", width=0.5),
-                        label=label,
-                        color=n_color(data_sankey),
-                    ),
-                    link=dict(
-                        source=data_sankey["source"],
-                        target=data_sankey["target"],
-                        value=data_sankey["value"],
-                        color=n_color(data_sankey),
-                    ),
-                    valueformat=".2s",
-                )
-            ]
+        sankey_chart = sankey_create(
+            data_node=data_node, data_sankey=data_sankey, n=20, nlargest=True
         )
         sankey_chart.update_layout(
-            height=860,
-            title=dict(
-                text="Sebaran Penerimaan Sektor ke Jenis Pajak",
-                font=dict(color="#28377a", size=26),
-                x=0.3,
-                y=0.95,
-            ),
-            paper_bgcolor=background,
-            plot_bgcolor="#ECF9FF",
+            title=dict(text=f"{20} Besar Sebaran Sektor ke Jenis Pajak")
         )
         # st.subheader("Sebaran Penerimaan Sektor ke Jenis Pajak")
         with chart_container(data_sankey):
@@ -800,11 +923,11 @@ if st.session_state["authentication_status"]:
             sektor_data = [sektor22, sektor23]
             sektor_layout = go.Layout(
                 barmode="group",
-                height=860,
+                height=960,
                 bargap=0.1,
                 xaxis=dict(visible=False),
                 title=dict(
-                    text="Per Sektor (Bruto)",
+                    text=f"Sektor Bruto YoY<br>{start}:{end}",
                     font=dict(color="slategrey", size=26),
                     x=0.5,
                     y=0.95,
@@ -826,88 +949,11 @@ if st.session_state["authentication_status"]:
             )  # autorange="reversed"
             with chart_container(data_sektor):
                 st.plotly_chart(sektor_chart, use_container_width=True)
-            # ------------------------------------------------------------------------------------------------------
-            top4_kat = data_sektor.nlargest(6, columns="BRUTO2023")
-            top4_kat = top4_kat["NM_KATEGORI"].tolist()
-
-            sektor_mom = data_sektor_awal[1]
-            sektor_mom = sektor_mom[["NM_KATEGORI", "BULANBAYAR", "BRUTO2023"]]
-            sektor_mom = sektor_mom[sektor_mom["NM_KATEGORI"] != ""]
-            sektor_mom.fillna(0, inplace=True)
-            sektor_mom = (
-                sektor_mom.groupby(["NM_KATEGORI", "BULANBAYAR"]).sum().reset_index()
-            )
-            sektor_mom = sektor_mom.sort_values(
-                by=["NM_KATEGORI", "BULANBAYAR"], ascending=True
-            )
-
-            sektor_mom_top4 = sektor_mom[sektor_mom["NM_KATEGORI"].isin(top4_kat)]
-            st.subheader("Month Over Month Growth 6 Sektor Terbesar")
-
-            rows = ceil(len(sektor_mom_top4["NM_KATEGORI"].unique()) / 3)
-            container = {}
-            counter = 1
-            for row in range(1, rows + 1):
-                container[row] = st.container()
-                with container[row]:
-                    cekisi = len(sektor_mom_top4["NM_KATEGORI"].unique())
-                    cek_baris = ceil(cekisi / 3)
-                    sisa4 = cekisi % 3
-                    if row < cek_baris:
-                        col = st.columns(3)
-                    elif sisa4 == 1:
-                        col = st.columns([50, 50])
-                    elif sisa4 == 2:
-                        col = st.columns(3)
-                    for x in range(1, 4):
-                        if counter <= len(sektor_mom_top4["NM_KATEGORI"].unique()):
-                            with col[x - 1]:
-                                data_col = sektor_mom_top4[
-                                    sektor_mom_top4["NM_KATEGORI"]
-                                    == top4_kat[counter - 1]
-                                ]
-                                data_col["MoM_GROWTH"] = (
-                                    data_col["BRUTO2023"].pct_change(periods=1)
-                                ) * 100
-                                data_col["WARNA"] = data_col["MoM_GROWTH"].apply(
-                                    lambda x: "Merah" if x < 0 else "Hijau"
-                                )
-                                mom_chart = px.bar(
-                                    data_col,
-                                    x="MoM_GROWTH",
-                                    y="BULANBAYAR",
-                                    color="WARNA",
-                                    orientation="h",
-                                    text_auto=".2f",
-                                    color_discrete_sequence=["#02275d", "#F96666"],
-                                )
-                                mom_chart.update_layout(
-                                    xaxis=dict(visible=False),
-                                    yaxis=dict(visible=False, autorange="reversed"),
-                                    # yaxis=dict(tickfont=dict(color="#fff")),
-                                    title=dict(
-                                        text=f"{top4_kat[counter-1]}",
-                                        # font=dict(color="#4d5b69"),
-                                        x=0.25,
-                                        y=0.95,
-                                        font=dict(size=14, color="slategrey"),
-                                    ),
-                                    showlegend=False,
-                                    bargap=0.2,
-                                    paper_bgcolor=background_mom,
-                                    plot_bgcolor="rgba(0, 0, 0, 0)",
-                                )
-
-                                st.plotly_chart(mom_chart, use_container_width=True)
-
-                                # st.dataframe(data_col)
-                        counter += 1
-
         except:
-            st.subheader("🪂 No Data Available🪂")
-        # data
+            st.subheader("🪂No Data Available🪂")
+
+            # ------------------------------------------------------------------------------------------------------
         try:
-            colsek = st.columns(2)
             data_sektor_table = sektor_yoy(filter, filter22, includewp=True)[2]
             data_sektor_table = data_sektor_table[
                 [
@@ -922,27 +968,17 @@ if st.session_state["authentication_status"]:
                     "TumbuhBruto",
                 ]
             ]
-            with colsek[0]:
-                with chart_container(data_sektor_table):
-                    st.dataframe(
-                        filter_dataframe(data_sektor_table, key=unique_key(5)),
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-            with colsek[1]:
-                with chart_container(sektor_mom):
-                    st.dataframe(
-                        filter_dataframe(sektor_mom, key=unique_key(6)),
-                        use_container_width=True,
-                        hide_index=True,
-                    )
 
-            st.markdown(
-                """<hr style="height:1px;border:none;color:#FFFFFF;background-color:#ffc91b;" /> """,
-                unsafe_allow_html=True,
-            )
-
+            with chart_container(data_sektor_table):
+                st.dataframe(
+                    filter_dataframe(data_sektor_table, key=unique_key(5)),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+        except:
+            st.subheader("🪂No Data Available🪂")
             # JENIS PAJAK----------------------------------------------------------------------------------------
+        try:
             jenis_pajak, jenis_pajak9 = jns_pajak(filter, filter22, includewp=False)
 
             jenis_pajak9 = jenis_pajak9.sort_values(by="BRUTO2023", ascending=True)
@@ -997,119 +1033,10 @@ if st.session_state["authentication_status"]:
 
             with chart_container(jenis_pajak9):
                 st.plotly_chart(mapchart, use_container_width=True)
-
+        except:
+            st.subheader("🪂No Data Available🪂")
             # -----------------------------------------------------------------------------------------
-            top4_map = jenis_pajak9.nlargest(6, columns="BRUTO2023")
-            top4_map = top4_map["MAP"].tolist()
-
-            map_mom = map_mom(filter)
-
-            map_mom = map_mom[map_mom["MAP"] != ""]
-            map_mom.fillna(0, inplace=True)
-            map_mom = map_mom.groupby(["MAP", "BULANBAYAR"]).sum().reset_index()
-            map_mom = map_mom.sort_values(by=["MAP", "BULANBAYAR"], ascending=True)
-            # map_mom["MoM_GROWTH"] = (map_mom["NOMINAL"].pct_change(periods=1)) * 100
-            map_mom_top4 = map_mom[map_mom["MAP"].isin(top4_map)]
-
-            st.subheader("Month Over Month Growth 6 Jenis Pajak Terbesar")
-
-            rows = ceil(len(map_mom_top4["MAP"].unique()) / 3)
-            container = {}
-            counter = 1
-            for row in range(1, rows + 1):
-                container[row] = st.container()
-                with container[row]:
-                    cekisi = len(map_mom_top4["MAP"].unique())
-                    cek_baris = ceil(cekisi / 3)
-                    sisa4 = cekisi % 3
-                    if row < cek_baris:
-                        col = st.columns(3)
-                    elif sisa4 == 1:
-                        col = st.columns([33.3])
-                    elif sisa4 == 2:
-                        col = st.columns(3)
-                    for x in range(1, 4):
-                        if counter <= len(map_mom_top4["MAP"].unique()):
-                            with col[x - 1]:
-                                data_col = map_mom_top4[
-                                    map_mom_top4["MAP"] == top4_map[counter - 1]
-                                ]
-                                # st.write(counter)
-                                # st.write(top4_map[counter - 1])
-
-                                data_col["MoM_GROWTH"] = (
-                                    data_col["NOMINAL"].pct_change(periods=1)
-                                ) * 100
-                                data_col["WARNA"] = data_col["MoM_GROWTH"].apply(
-                                    lambda x: "Merah" if x < 0 else "Hijau"
-                                )
-                                mom_chart = px.bar(
-                                    data_col,
-                                    x="MoM_GROWTH",
-                                    y="BULANBAYAR",
-                                    color="WARNA",
-                                    orientation="h",
-                                    text_auto=".2f",
-                                    color_discrete_sequence=["#02275d", "#F96666"],
-                                )
-                                mom_chart.update_layout(
-                                    xaxis=dict(visible=False),
-                                    yaxis=dict(visible=False, autorange="reversed"),
-                                    # yaxis=dict(tickfont=dict(color="#fff")),
-                                    title=dict(
-                                        text=f"{top4_map[counter - 1]}",
-                                        # font=dict(color="#4d5b69"),
-                                        x=0.25,
-                                        y=0.95,
-                                        font=dict(size=14, color="slategrey"),
-                                    ),
-                                    showlegend=False,
-                                    bargap=0.2,
-                                    paper_bgcolor=background_mom,
-                                    plot_bgcolor="rgba(0, 0, 0, 0)",
-                                )
-
-                                st.plotly_chart(mom_chart, use_container_width=True)
-
-                        counter += 1
-
-            # --------------------------------------------------------------------------------------------------------
-            kjs = kjs(filter)
-            kjs["BRUTO_M"] = kjs["BRUTO"] / 1000000000
-            kjs["Kontribusi"] = (kjs["BRUTO"] / kjs["BRUTO"].sum()) * 100
-            kjschart = px.treemap(
-                kjs,
-                labels="KDBAYAR",
-                values="BRUTO_M",
-                path=["KDBAYAR"],
-                color="MAP",
-                color_discrete_sequence=px.colors.qualitative.Safe,
-                height=560,
-                custom_data=["Kontribusi"],
-                title="Proporsi Penerimaan per Kode Jenis Setoran",
-            )
-            hovertemplate = (
-                "<b>%{label}</b><br><br>"
-                + "KDBAYAR: %{id}<br>"
-                + "%{customdata[0]:,.2f} persen<br>"
-                + "BRUTO: %{value:,.1f}M <extra></extra>"
-            )
-            kjschart.update_traces(hovertemplate=hovertemplate)
-
-            kjschart.update_layout(
-                paper_bgcolor=background,
-                plot_bgcolor="rgba(0, 0, 0, 0)",
-                xaxis_title="",
-                yaxis_title="",
-                title=dict(
-                    font=dict(color="slategrey", size=26),
-                    x=0.5,
-                    y=0.95,
-                ),
-            )
-            with chart_container(kjs):
-                st.plotly_chart(kjschart, use_container_width=True)
-
+        try:
             jenis_wp, *_ = jns_pajak(filter, filter22, includewp=True)
             with chart_container(jenis_wp.reset_index()):
                 # jenis_pajak = jenis_pajak[
@@ -1127,153 +1054,91 @@ if st.session_state["authentication_status"]:
             )
         except:
             st.subheader("🪂 No Data Available🪂")
+            # --------------------------------------------------------------------------------------------------------
 
         # TOP10-----------------------------------------------------------------------------------
+        # try:
+        topwp, botwp = naikturun(filter, filter22)
 
-        try:
-            topwp, botwp = naikturun(filter, filter22)
+        topwp.iloc[:, 2:] = (topwp.iloc[:, 2:] / 1000000000).applymap(
+            lambda x: "{:,.1f}".format(x)
+        )
 
-            topwp.iloc[:, 2:] = (topwp.iloc[:, 2:] / 1000000000).applymap(
-                lambda x: "{:,.1f}".format(x)
-            )
+        botwp.iloc[:, 2:] = (botwp.iloc[:, 2:] / 1000000000).applymap(
+            lambda x: "{:,.1f}".format(x)
+        )
 
-            botwp.iloc[:, 2:] = (botwp.iloc[:, 2:] / 1000000000).applymap(
-                lambda x: "{:,.1f}".format(x)
-            )
-
-            with st.container():
-                tab_wp = st.tabs(["Top 10 WP", "Top 10 Tumbuh", "Bottom 10 WP Tumbuh"])
-                with tab_wp[0]:
-                    data_proporsi, bruto = proporsi(filter)
-                    data_proporsi["text"] = data_proporsi["BRUTO"].apply(
-                        lambda x: format_angka(x)
+        with st.container():
+            tab_wp = st.tabs(["Top 10 WP", "Top 10 Tumbuh", "Bottom 10 WP Tumbuh"])
+            with tab_wp[0]:
+                data_proporsi, bruto = proporsi(filter)
+                data_proporsi["text"] = data_proporsi["BRUTO"].apply(
+                    lambda x: format_angka(x)
+                )
+                # data_proporsi["uraian"] = (
+                #     data_proporsi["text"] + "<br>" + str(data_proporsi["KONTRIBUSI"])
+                # )
+                with chart_container(data_proporsi):
+                    # PROPORSI--------------------------------------------------------------------
+                    row = len(data_proporsi) - 5
+                    data_proporsi = data_proporsi.iloc[:row,]
+                    proporsi_chart = go.Figure(
+                        go.Funnel(
+                            y=data_proporsi["NAMA_WP"],
+                            x=data_proporsi["BRUTO"] / 1000000000,
+                            textposition="inside",
+                            # textinfo="value+percent initial",
+                            text=data_proporsi["KONTRIBUSI"],
+                            texttemplate="%{x:,.2f}M <br> %{text:.2f}%",
+                            opacity=1,
+                            marker={
+                                "color": [
+                                    "#005fac",
+                                    "#1473af",
+                                    "#2888b1",
+                                    "#3a9db4",
+                                    "#4cb3b7",
+                                    "#5ec8ba",
+                                    "#70debd",
+                                    "#82f3c0",
+                                    "#95f8c3",
+                                    "#a9fed0",
+                                ],
+                                "line": {
+                                    "width": [4, 2, 2, 3, 1, 1],
+                                    "color": ["white"] * 10,
+                                },
+                            },
+                            connector={
+                                "line": {
+                                    "color": "royalblue",
+                                    "dash": "dot",
+                                    "width": 3,
+                                }
+                            },
+                        )
                     )
-                    # data_proporsi["uraian"] = (
-                    #     data_proporsi["text"] + "<br>" + str(data_proporsi["KONTRIBUSI"])
-                    # )
-                    with chart_container(data_proporsi):
-                        # PROPORSI--------------------------------------------------------------------
-                        row = len(data_proporsi) - 5
-                        data_proporsi = data_proporsi.iloc[:row,]
-                        proporsi_chart = go.Figure(
-                            go.Funnel(
-                                y=data_proporsi["NAMA_WP"],
-                                x=data_proporsi["BRUTO"] / 1000000000,
-                                textposition="inside",
-                                # textinfo="value+percent initial",
-                                text=data_proporsi["KONTRIBUSI"],
-                                texttemplate="%{x:,.2f}M <br> %{text:.2f}%",
-                                opacity=1,
-                                marker={
-                                    "color": [
-                                        "#005fac",
-                                        "#1473af",
-                                        "#2888b1",
-                                        "#3a9db4",
-                                        "#4cb3b7",
-                                        "#5ec8ba",
-                                        "#70debd",
-                                        "#82f3c0",
-                                        "#95f8c3",
-                                        "#a9fed0",
-                                    ],
-                                    "line": {
-                                        "width": [4, 2, 2, 3, 1, 1],
-                                        "color": ["white"] * 10,
-                                    },
-                                },
-                                connector={
-                                    "line": {
-                                        "color": "royalblue",
-                                        "dash": "dot",
-                                        "width": 3,
-                                    }
-                                },
-                            )
-                        )
-                        proporsi_chart.update_layout(
-                            height=820,
-                            title=dict(
-                                text="10 WP Terbesar Bruto",
-                                x=0.5,
-                                y=0.95,
-                                font=dict(size=26, color="slategrey"),
-                            ),
-                            paper_bgcolor=background,
-                            plot_bgcolor="rgba(0, 0, 0, 0)",
-                        )
-                        st.plotly_chart(proporsi_chart, use_container_width=True)
-                    with chart_container(bruto):
-                        st.dataframe(
-                            filter_dataframe(bruto, key=unique_key(23)),
-                            use_container_width=True,
-                            hide_index=True,
-                        )
-                with tab_wp[1]:
-                    with chart_container(topwp):
-                        table_top = go.Figure(
-                            data=[
-                                go.Table(
-                                    columnorder=[1, 2, 3, 4, 5],
-                                    columnwidth=[40, 100, 30, 30, 30],
-                                    header=dict(
-                                        values=[
-                                            ["<b>NPWP</b>"],
-                                            ["<b>NAMA WP</b>"],
-                                            ["<b>2022(M)</b>"],
-                                            ["<b>2023(M)</b>"],
-                                            ["<b>SELISIH(M)</b>"],
-                                        ],
-                                        fill_color="#005FAC",
-                                        line_color="gray",
-                                        align=[
-                                            "center",
-                                            "center",
-                                            "center",
-                                            "center",
-                                            "center",
-                                        ],
-                                        font=dict(color="white", size=16),
-                                        height=40,
-                                    ),
-                                    cells=dict(
-                                        values=[topwp[x] for x in topwp.columns],
-                                        fill=dict(
-                                            color=[
-                                                "paleturquoise",
-                                                "paleturquoise",
-                                                "white",
-                                                "white",
-                                                "white",
-                                            ]
-                                        ),
-                                        line_color="darkslategray",
-                                        align=[
-                                            "left",
-                                            "left",
-                                            "center",
-                                            "center",
-                                            "center",
-                                        ],
-                                        font_size=14,
-                                        height=30,
-                                    ),
-                                )
-                            ]
-                        )
-                        table_top.update_layout(
-                            height=640,
-                            width=960,
-                            title=dict(
-                                text="10 Tumbuh Terbesar Bruto",
-                                x=0.5,
-                                y=0.95,
-                                font=dict(size=26, color="slategrey"),
-                            ),
-                        )
-                        st.plotly_chart(table_top, use_container_width=True)
-                with tab_wp[2]:
-                    table_bot = go.Figure(
+                    proporsi_chart.update_layout(
+                        height=820,
+                        title=dict(
+                            text="10 WP Terbesar Bruto",
+                            x=0.5,
+                            y=0.95,
+                            font=dict(size=26, color="slategrey"),
+                        ),
+                        paper_bgcolor=background,
+                        plot_bgcolor="rgba(0, 0, 0, 0)",
+                    )
+                    st.plotly_chart(proporsi_chart, use_container_width=True)
+                with chart_container(bruto):
+                    st.dataframe(
+                        filter_dataframe(bruto, key=unique_key(23)),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            with tab_wp[1]:
+                with chart_container(topwp):
+                    table_top = go.Figure(
                         data=[
                             go.Table(
                                 columnorder=[1, 2, 3, 4, 5],
@@ -1286,7 +1151,7 @@ if st.session_state["authentication_status"]:
                                         ["<b>2023(M)</b>"],
                                         ["<b>SELISIH(M)</b>"],
                                     ],
-                                    fill_color="#f07167",
+                                    fill_color="#005FAC",
                                     line_color="gray",
                                     align=[
                                         "center",
@@ -1299,17 +1164,17 @@ if st.session_state["authentication_status"]:
                                     height=40,
                                 ),
                                 cells=dict(
-                                    values=[botwp[x] for x in botwp.columns],
+                                    values=[topwp[x] for x in topwp.columns],
                                     fill=dict(
                                         color=[
-                                            "#fbc4ab",
-                                            "#fbc4ab",
+                                            "paleturquoise",
+                                            "paleturquoise",
                                             "white",
                                             "white",
                                             "white",
                                         ]
                                     ),
-                                    line_color="gray",
+                                    line_color="darkslategray",
                                     align=[
                                         "left",
                                         "left",
@@ -1323,164 +1188,95 @@ if st.session_state["authentication_status"]:
                             )
                         ]
                     )
-                    table_bot.update_layout(
+                    table_top.update_layout(
                         height=640,
-                        width=1024,
+                        width=960,
                         title=dict(
-                            text="10 Tumbuh Terendah Bruto",
+                            text="10 Tumbuh Terbesar Bruto",
                             x=0.5,
                             y=0.95,
                             font=dict(size=26, color="slategrey"),
                         ),
                     )
-                    with chart_container(botwp):
-                        st.plotly_chart(table_bot, use_container_width=True)
-        except:
-            st.subheader("🪂 No Data Available🪂")
-
-            # CLUSTER KPP ------------------------------------------------------------------------------------
-        try:
-            capaian = cluster(filter, filter22, kpp)
-            capaian_table = capaian.copy()
-            capaian_table.loc[:, "TARGET2023":"REALISASI2023"] = capaian_table.loc[
-                :, "TARGET2023":"REALISASI2023"
-            ].applymap(lambda x: "{:,.2f}M".format(x / 1000000000))
-            capaian_table.loc[:, "capaian":] = capaian_table.loc[
-                :, "capaian":
-            ].applymap(lambda x: "{:,.2f}%".format(x))
-            # capaian_table = ff.create_table(capaian_table)
-            avg_capaian = capaian["capaian"].mean()
-            avg_tumbuh = capaian["tumbuh"].mean()
-
-            cluster_chart = px.scatter(
-                capaian,
-                x="capaian",
-                y="tumbuh",
-                text="ADMIN",
-                color_continuous_scale=px.colors.diverging.RdBu,
-            )
-            hovertemplate = (
-                "<b>%{text}</b><br><br>"
-                + "Capaian: %{x:,.2f}persen <br>"
-                + "Tumbuh: %{y:,.2f}persen <extra></extra>"
-            )
-            cluster_chart.update_traces(
-                marker=dict(size=20, color="#F86F03"),
-                textposition="bottom center",
-                textfont=dict(color="#F86F03", size=14),
-                hovertemplate=hovertemplate,
-            )
-            cluster_chart.add_hline(
-                y=avg_tumbuh,
-                line_dash="dash",
-                line_color="red",
-                name="Rata2 Tumbuh",
-            )
-            cluster_chart.add_vline(
-                x=avg_capaian,
-                line_dash="dash",
-                line_color="red",
-                name="Rata2 Capaian",
-            )
-            cluster_chart.add_trace(
-                go.Scatter(
-                    x=[avg_capaian],
-                    y=[avg_tumbuh],
-                    mode="markers",
-                    marker=dict(color="green", symbol="x", size=20),
-                    name="Rata-rata",
+                    st.plotly_chart(table_top, use_container_width=True)
+            with tab_wp[2]:
+                table_bot = go.Figure(
+                    data=[
+                        go.Table(
+                            columnorder=[1, 2, 3, 4, 5],
+                            columnwidth=[40, 100, 30, 30, 30],
+                            header=dict(
+                                values=[
+                                    ["<b>NPWP</b>"],
+                                    ["<b>NAMA WP</b>"],
+                                    ["<b>2022(M)</b>"],
+                                    ["<b>2023(M)</b>"],
+                                    ["<b>SELISIH(M)</b>"],
+                                ],
+                                fill_color="#f07167",
+                                line_color="gray",
+                                align=[
+                                    "center",
+                                    "center",
+                                    "center",
+                                    "center",
+                                    "center",
+                                ],
+                                font=dict(color="white", size=16),
+                                height=40,
+                            ),
+                            cells=dict(
+                                values=[botwp[x] for x in botwp.columns],
+                                fill=dict(
+                                    color=[
+                                        "#fbc4ab",
+                                        "#fbc4ab",
+                                        "white",
+                                        "white",
+                                        "white",
+                                    ]
+                                ),
+                                line_color="gray",
+                                align=[
+                                    "left",
+                                    "left",
+                                    "center",
+                                    "center",
+                                    "center",
+                                ],
+                                font_size=14,
+                                height=30,
+                            ),
+                        )
+                    ]
                 )
-            )
-            cluster_chart.update_layout(
-                title=dict(
-                    text="Clustering Capaian & Tumbuh Unit Kerja(Bruto)",
-                    font=dict(color="slategrey", size=26),
-                    x=0.3,
-                    y=0.95,
-                ),
-                # paper_bgcolor="#F6FFF8",
-                plot_bgcolor="rgba(0, 0, 0, 0)",
-            )
-            with chart_container(capaian_table):
-                st.plotly_chart(cluster_chart, use_container_width=True)
-        except:
-            st.subheader("🪂 No Data Available🪂")
-
-        try:
-            top10kpp = top10kpp(filter_date, filter_date22, filter_cat)
-            top10kpp = top10kpp[~top10kpp["ADMIN"].isin(["007", "097"])]
-            avg_realisasi = top10kpp["CY"].mean()
-            avg_tumbuh_kpp = top10kpp["TUMBUH"].mean()
-            cluster_top10kpp = px.scatter(
-                top10kpp,
-                x="CY",
-                y="TUMBUH",
-                # text="NAMA_WP",
-                color="ADMIN",
-                color_continuous_scale=px.colors.diverging.RdBu,
-                custom_data=["NAMA_WP", "PY"],
-            )
-            hovertemplate = (
-                "<b>%{customdata[0]}</b><br><br>"
-                + "Current Year: %{x:,.0f} <br>"
-                + "Prior Year: %{customdata[1]:,.0f}<br>"
-                + "Tumbuh: %{y:,.2f}persen <extra></extra>"
-            )
-            cluster_top10kpp.update_traces(
-                marker=dict(size=10),
-                textposition="bottom center",
-                textfont=dict(color="#F86F03", size=14),
-                hovertemplate=hovertemplate,
-            )
-            cluster_top10kpp.add_hline(
-                y=avg_tumbuh_kpp,
-                line_dash="dash",
-                line_color="red",
-                name="Rata2 Tumbuh",
-            )
-            cluster_top10kpp.add_vline(
-                x=avg_realisasi,
-                line_dash="dash",
-                line_color="red",
-                name="Rata2 Capaian",
-            )
-            cluster_top10kpp.add_trace(
-                go.Scatter(
-                    x=[avg_realisasi],
-                    y=[avg_tumbuh_kpp],
-                    mode="markers",
-                    marker=dict(color="green", symbol="x", size=20),
-                    name="Rata-rata",
+                table_bot.update_layout(
+                    height=640,
+                    width=1024,
+                    title=dict(
+                        text="10 Tumbuh Terendah Bruto",
+                        x=0.5,
+                        y=0.95,
+                        font=dict(size=26, color="slategrey"),
+                    ),
                 )
-            )
-            cluster_top10kpp.update_layout(
-                title=dict(
-                    text="Clustering 10 WP Besar per KPP Pratama(Bruto)",
-                    font=dict(color="slategrey", size=26),
-                    x=0.3,
-                    y=0.95,
-                ),
-                xaxis={"visible": False},
-                yaxis={"visible": False},
-                # paper_bgcolor="#F6FFF8",
-                plot_bgcolor="rgba(0, 0, 0, 0)",
-            )
+                with chart_container(botwp):
+                    st.plotly_chart(table_bot, use_container_width=True)
+        # except:
+        #     st.subheader("🪂 No Data Available🪂")
 
-            with chart_container(top10kpp):
-                st.plotly_chart(cluster_top10kpp, use_container_width=True)
-        except:
-            st.subheader("🪂 No Data Available🪂")
+        # CLUSTER KPP ------------------------------------------------------------------------------------
 
         # ALCO=============================================================================================================================
     elif tabs == "ALCo":
-        adm = get_adm(st.session_state["username"])[0]
-        adm = adm[0]
+        adm = get_adm(st.session_state["username"])
         start, end, kpp, map, sektor, segmen, wp = filter_ui(adm)
 
         # filterdata
         filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
         filter = "and".join(x for x in filter_gabungan[0])
         filter22 = "and".join(x for x in filter_gabungan[1])
+
         style_metric_cards(
             background_color="rgba(0,0,0,0)",
             border_color="rgba(0,0,0,0)",
@@ -1794,10 +1590,542 @@ if st.session_state["authentication_status"]:
 
             st.plotly_chart(tumbuh, use_container_width=True)
 
+    elif tabs == "Report":
+        submenu_opt = ["KLU x MAP", "Tren Penerimaan-Kewilayahan"]
+        submenu = st.selectbox(label="Jenis Report", options=submenu_opt)
+
+        if submenu == "KLU x MAP":
+            adm = get_adm(st.session_state["username"])
+
+            start, end, kpp, map, sektor, segmen, wp = filter_ui(adm, timeseries=True)
+            filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
+            filter = "and".join(x for x in filter_gabungan[0])
+            filter_date = "and".join(x for x in filter_gabungan[0][:2])
+            filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
+            filter_cat = "and".join(x for x in filter_gabungan[1][2:])
+
+            klumap = kluxmap(filter)
+
+            col1, col2, col3 = st.columns(3)
+            style_metric_cards(
+                background_color="rgba(0,0,0,0)",
+                border_color="rgba(0,0,0,0)",
+                border_left_color="rgba(0,0,0,0)",
+            )
+            with col1:
+                bruto = klumap[klumap["TAHUNBAYAR"] == 2021]["Bruto"].sum()
+                st.metric(label="2021", value=format_angka(bruto))
+
+            with col2:
+                bruto = klumap[klumap["TAHUNBAYAR"] == 2022]["Bruto"].sum()
+                st.metric(label="2022", value=format_angka(bruto))
+
+            with col3:
+                bruto = klumap[klumap["TAHUNBAYAR"] == 2023]["Bruto"].sum()
+                st.metric(label="2023", value=format_angka(bruto))
+
+            line_fig = px.line(
+                klumap.groupby(["TAHUNBAYAR", "BULANBAYAR"])["Bruto"]
+                .sum()
+                .reset_index(),
+                x="BULANBAYAR",
+                y="Bruto",
+                color="TAHUNBAYAR",
+                markers=True,
+            )
+            line_fig.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                yaxis={"visible": False},
+                xaxis={
+                    "tickmode": "array",
+                    "tickvals": [x for x in range(1, 13)],
+                    "ticktext": [calendar.month_name[i] for i in range(1, 13)],
+                    # "tickfont": {"color": "#fff"},
+                },
+                title=dict(text="Tren Penerimaan Pajak Bruto Per Bulan", x=0.5),
+            )
+            st.plotly_chart(line_fig, use_container_width=True)
+            # ======================================================
+            klumap_2023 = klumap[klumap["TAHUNBAYAR"] == 2023]
+            maxbulan = klumap_2023["BULANBAYAR"].max()
+            klumap_2022 = klumap[klumap["TAHUNBAYAR"] == 2022]
+            klumap_2022_uptonow = klumap_2022[klumap_2022["BULANBAYAR"] <= maxbulan]
+
+            sektormap = pd.pivot_table(
+                klumap,
+                index=["NM_KATEGORI", "MAP"],
+                columns="TAHUNBAYAR",
+                values="Bruto",
+                aggfunc="sum",
+            ).reset_index()
+
+            klumap_2022_uptonow = (
+                pd.pivot_table(
+                    klumap_2022_uptonow,
+                    index=["NM_KATEGORI", "MAP"],
+                    columns="TAHUNBAYAR",
+                    values="Bruto",
+                    aggfunc="sum",
+                )
+                .reset_index()
+                .rename(columns={2022: "2022BulanYgSama"})
+            )
+            sektormap = sektormap.merge(
+                klumap_2022_uptonow, on=["NM_KATEGORI", "MAP"], how="left"
+            )
+            sektormap["Naik/Turun"] = sektormap[2023] - sektormap["2022BulanYgSama"]
+            sektormap["Ket"] = sektormap["Naik/Turun"].apply(
+                lambda x: "Naik" if x > 0 else "Turun",
+            )
+
+            sektormap["%"] = (
+                sektormap["Naik/Turun"] / sektormap["2022BulanYgSama"]
+            ) * 100
+
+            top20_sankey = sektormap[["NM_KATEGORI", "MAP", "Naik/Turun"]]
+            data_node = pd.DataFrame(
+                pd.concat(
+                    [
+                        pd.Series(top20_sankey["NM_KATEGORI"].unique()),
+                        pd.Series(top20_sankey["MAP"].unique()),
+                    ],
+                    ignore_index=True,
+                    axis=0,
+                ),
+                columns=["label"],
+            ).reset_index()
+            top20_sankey = top20_sankey.merge(
+                data_node[["index", "label"]],
+                left_on="NM_KATEGORI",
+                right_on="label",
+                how="left",
+            )
+            top20_sankey = top20_sankey.merge(
+                data_node[["index", "label"]],
+                left_on="MAP",
+                right_on="label",
+                how="left",
+            )
+            top20_sankey.rename(
+                columns={
+                    "index_x": "source",
+                    "index_y": "target",
+                    "Naik/Turun": "value",
+                },
+                inplace=True,
+            )
+            top20_sankey.drop(columns=["label_x", "label_y"], inplace=True)
+
+            sankey_top = sankey_create(
+                data_node=data_node, data_sankey=top20_sankey, n=20, nlargest=True
+            )
+
+            sankey_bottom = sankey_create(
+                data_node=data_node, data_sankey=top20_sankey, n=20, nlargest=False
+            )
+
+            colup, colbot = st.columns(2)
+            with colup:
+                st.plotly_chart(sankey_top, use_container_width=True)
+            with colbot:
+                st.plotly_chart(sankey_bottom, use_container_width=True)
+            # ================================================
+            # bar
+            st.write(filter_cat)
+            klu_rank = klu_rank(filter_date, filter_date22, filter_cat)
+            klu_rank["KLU_cutted"] = klu_rank["NAMA_KLU"].str[:30] + "..."
+            barklu_persen = px.bar(
+                klu_rank.nlargest(10, "%").sort_values(by="%", ascending=True),
+                x="%",
+                y="KLU_cutted",
+                orientation="h",
+                text="%",
+                height=640,
+                title="10 Besar Persentase Tumbuh",
+            )
+            barklu_persen.update_traces(texttemplate="%{x:,.0f}%", textposition="auto")
+            barklu_persen.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                xaxis={"visible": False},
+                title=dict(x=0.5),
+            )
+
+            barklu_nominal = px.bar(
+                (
+                    klu_rank.nlargest(10, "Naik/Turun").sort_values(
+                        by="Naik/Turun", ascending=True
+                    )
+                ).assign(Milyar=klu_rank["Naik/Turun"] / 1000000000),
+                x="Milyar",
+                y="KLU_cutted",
+                orientation="h",
+                text="Naik/Turun",
+                height=640,
+                title="10 Besar Nominal Tumbuh",
+            )
+            barklu_nominal.update_traces(texttemplate="%{x:,.1f}M", textposition="auto")
+            barklu_nominal.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                xaxis={"visible": False},
+                title=dict(x=0.5),
+            )
+            colbarklu_naik = st.columns(2)
+            with colbarklu_naik[0]:
+                st.plotly_chart(barklu_persen, use_container_width=True)
+            with colbarklu_naik[1]:
+                st.plotly_chart(barklu_nominal, use_container_width=True)
+            with st.expander(label="Detail Data"):
+                st.dataframe(klu_rank, use_container_width=True, hide_index=True)
+            # ====================================================================
+            mapdf = sektormap.groupby(["MAP"])[[2022, "Naik/Turun"]].sum().reset_index()
+            mapdf["%"] = round((mapdf["Naik/Turun"] / mapdf[2022]) * 100, 2)
+            mapdf["%"] = mapdf["%"].apply(lambda x: 1 if x == np.inf else x)
+
+            barmap_persen = px.bar(
+                mapdf.nlargest(10, "%").sort_values(by="%", ascending=True),
+                x="%",
+                y="MAP",
+                orientation="h",
+                text="%",
+                height=640,
+                title="10 Besar Persentase Tumbuh",
+            )
+            barmap_persen.update_traces(texttemplate="%{x:,.0f}%", textposition="auto")
+            barmap_persen.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                xaxis={"visible": False},
+                title=dict(x=0.5),
+            )
+
+            barmap_nominal = px.bar(
+                (
+                    mapdf.nlargest(10, "Naik/Turun").sort_values(
+                        by="Naik/Turun", ascending=True
+                    )
+                ).assign(Milyar=mapdf["Naik/Turun"] / 1000000000),
+                x="Milyar",
+                y="MAP",
+                orientation="h",
+                text="Naik/Turun",
+                height=640,
+                title="10 Besar Nominal Tumbuh",
+            )
+            barmap_nominal.update_traces(texttemplate="%{x:,.1f}M", textposition="auto")
+            barmap_nominal.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                xaxis={"visible": False},
+                title=dict(x=0.5),
+            )
+            colbarklu_naik = st.columns(2)
+            with colbarklu_naik[0]:
+                st.plotly_chart(barmap_persen, use_container_width=True)
+            with colbarklu_naik[1]:
+                st.plotly_chart(barmap_nominal, use_container_width=True)
+            with st.expander(label="Detail Data"):
+                st.dataframe(mapdf, use_container_width=True, hide_index=True)
+            # ====================================================================
+            sektormap.columns = sektormap.columns.astype(str)
+            st.write("Klik Select untuk melihat data detail")
+            selection_df = dataframe_selection(sektormap)
+            with st.expander(label="Olah Lebih Lanjut?", expanded=False):
+                spread_df, code = spreadsheet(klumap)
+            if len(selection_df) > 0:
+                selection_sektor = selection_df["NM_KATEGORI"].unique()
+                selection_map = selection_df["MAP"].unique()
+                if filter_cat:
+                    filter_sekmap = f'{list_to_sql("NM_KATEGORI", selection_sektor)} AND {list_to_sql("MAP", selection_map)} AND {filter_cat}'
+                else:
+                    filter_sekmap = f'{list_to_sql("NM_KATEGORI", selection_sektor)} AND {list_to_sql("MAP", selection_map)}'
+                df_detail = detail_wp(filter_sekmap)
+                df_detail_uptonow = df_detail[df_detail["BULANBAYAR"] <= maxbulan]
+                df_detail.drop(columns="BULANBAYAR", inplace=True)
+                df_detail = (
+                    pd.pivot_table(
+                        df_detail,
+                        index=["NPWP15", "NAMA_WP", "NAMA_KLU"],
+                        columns="TAHUNBAYAR",
+                        values="sum",
+                    )
+                ).reset_index()
+
+                df_detail_uptonow = (
+                    (
+                        pd.pivot_table(
+                            df_detail_uptonow[df_detail_uptonow["TAHUNBAYAR"] == 2022],
+                            index=["NPWP15", "NAMA_WP", "NAMA_KLU"],
+                            columns="TAHUNBAYAR",
+                            values="sum",
+                        )
+                    )
+                    .reset_index()
+                    .rename(columns={2022: "2022BulanYgSama"})
+                )
+                df_detail = df_detail.merge(
+                    df_detail_uptonow, on=["NPWP15", "NAMA_WP", "NAMA_KLU"], how="left"
+                )
+                # df_detail_uptonow.drop(columns=[2021])
+                df_detail["Naik/Turun"] = df_detail[2023] - df_detail["2022BulanYgSama"]
+                df_detail["Ket"] = df_detail["Naik/Turun"].apply(
+                    lambda x: "Naik" if x > 0 else "Turun"
+                )
+                df_detail["%"] = (
+                    df_detail["Naik/Turun"] / df_detail["2022BulanYgSama"]
+                ) * 100
+                st.dataframe(df_detail, use_container_width=True, hide_index=True)
+                with st.expander(label="Olah Lebih Lanjut?", expanded=False):
+                    spread_df, code = spreadsheet(df_detail.fillna(0))
+            # https://docs.streamlit.io/knowledge-base/using-streamlit/how-to-get-row-selections
+
+        if submenu == "Tren Penerimaan-Kewilayahan":
+            adm = get_adm(st.session_state["username"])
+            start, end, kpp, map, sektor = filter_ui_kwl(adm, timeseries=True)
+            filter_gabungan = cek_filter(start, end, kpp, map, sektor)
+            filter = "and".join(x for x in filter_gabungan[0])
+            filter_date = "and".join(x for x in filter_gabungan[0][:2])
+            filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
+            data_kwl = tren_kwl(filter)
+            tren_kwl = (
+                data_kwl[["TAHUNBAYAR", "BULANBAYAR", "Bruto"]]
+                .groupby(["TAHUNBAYAR", "BULANBAYAR"])
+                .sum()
+                .reset_index()
+            )
+            col1, col2, col3 = st.columns(3)
+            style_metric_cards(
+                background_color="rgba(0,0,0,0)",
+                border_color="rgba(0,0,0,0)",
+                border_left_color="rgba(0,0,0,0)",
+            )
+            with col1:
+                bruto = tren_kwl[tren_kwl["TAHUNBAYAR"] == 2021]["Bruto"].sum()
+                st.metric(label="2021", value=format_angka(bruto))
+
+            with col2:
+                bruto = tren_kwl[tren_kwl["TAHUNBAYAR"] == 2022]["Bruto"].sum()
+                st.metric(label="2022", value=format_angka(bruto))
+
+            with col3:
+                bruto = tren_kwl[tren_kwl["TAHUNBAYAR"] == 2023]["Bruto"].sum()
+                st.metric(label="2023", value=format_angka(bruto))
+
+            line_fig = px.line(
+                tren_kwl.groupby(["TAHUNBAYAR", "BULANBAYAR"])["Bruto"]
+                .sum()
+                .reset_index(),
+                x="BULANBAYAR",
+                y="Bruto",
+                color="TAHUNBAYAR",
+                markers=True,
+            )
+            line_fig.update_layout(
+                xaxis_title="",
+                yaxis_title="",
+                yaxis={"visible": False},
+                xaxis={
+                    "tickmode": "array",
+                    "tickvals": [x for x in range(1, 13)],
+                    "ticktext": [calendar.month_name[i] for i in range(1, 13)],
+                    # "tickfont": {"color": "#fff"},
+                },
+            )
+            st.plotly_chart(line_fig, use_container_width=True)
+            with st.expander(label="Detail Data"):
+                st.dataframe(
+                    pd.pivot_table(
+                        data=tren_kwl,
+                        index=["BULANBAYAR"],
+                        columns="TAHUNBAYAR",
+                        values="Bruto",
+                        aggfunc="sum",
+                    ).reset_index(),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            # =============================================================
+            data_kwl_2022 = data_kwl[data_kwl["TAHUNBAYAR"] == 2022]
+            maxbulan = data_kwl_2022["BULANBAYAR"].max()
+            data_kwl_2022_uptonow = data_kwl_2022[
+                data_kwl_2022["BULANBAYAR"] <= maxbulan
+            ]
+
+            data_kwl_pv = pd.pivot_table(
+                data_kwl,
+                index=["ADMIN", "SEKSI", "NAMA_AR"],
+                columns="TAHUNBAYAR",
+                values="Bruto",
+                aggfunc="sum",
+            ).reset_index()
+            data_kwl_pv_uptonow = (
+                pd.pivot_table(
+                    data_kwl_2022_uptonow,
+                    index=["ADMIN", "SEKSI", "NAMA_AR"],
+                    columns="TAHUNBAYAR",
+                    values="Bruto",
+                    aggfunc="sum",
+                )
+                .reset_index()
+                .rename(columns={2022: "2022BulanYgSama"})
+            )
+
+            data_kwl_pv = data_kwl_pv.merge(
+                data_kwl_pv_uptonow, on=["ADMIN", "SEKSI", "NAMA_AR"], how="left"
+            )
+            data_kwl_pv["Naik/Turun"] = (
+                data_kwl_pv[2023] - data_kwl_pv["2022BulanYgSama"]
+            )
+            data_kwl_pv["Ket"] = data_kwl_pv["Naik/Turun"].apply(
+                lambda x: "Naik" if x > 0 else "Turun"
+            )
+            data_kwl_pv["%"] = (
+                data_kwl_pv["Naik/Turun"] / data_kwl_pv["2022BulanYgSama"]
+            ) * 100
+
+            # ====================================================================
+            adm_df = (
+                data_kwl.groupby(["ADMIN", "TAHUNBAYAR"])["Bruto"].sum().reset_index()
+            )
+
+            adm_df = adm_df[~adm_df["ADMIN"].isin(["007", "097"])]
+            adm_df["text"] = adm_df["Bruto"].apply(lambda x: format_angka(x))
+            adm_df["TAHUNBAYAR"] = adm_df["TAHUNBAYAR"].astype("str")
+            adm_chart = px.bar(
+                data_frame=adm_df,
+                x="ADMIN",
+                y="Bruto",
+                color="TAHUNBAYAR",
+                text="text",
+                height=380,
+                barmode="group",
+                color_discrete_sequence=["#ffca19", "#02275d", "#29a174"],
+                # custom_data=["TAHUNBAYAR"],
+            )
+
+            adm_chart.update_layout(
+                xaxis_title="",
+                yaxis_title="",
+                yaxis={"visible": False},
+                paper_bgcolor=background,
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                autosize=True,
+            )
+            st.plotly_chart(adm_chart, use_container_width=True)
+            # =====================================================
+            topwp_kwl = detail_wp_kwl(filter_date, filter_date22)
+            topwp_kwl["%"] = topwp_kwl["%"].apply(lambda x: 1 if x == np.inf else x)
+            barwil_persen = px.bar(
+                topwp_kwl.nlargest(10, "%").sort_values(by="%", ascending=True),
+                x="%",
+                y="NAMA_WP",
+                orientation="h",
+                text="%",
+                height=640,
+                title="10 Besar Persentase Tumbuh",
+            )
+            barwil_persen.update_traces(texttemplate="%{x:,.0f}%", textposition="auto")
+            barwil_persen.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                xaxis={"visible": False},
+                title=dict(x=0.5),
+            )
+
+            barwil_nominal = px.bar(
+                (
+                    topwp_kwl.nlargest(10, "Naik/Turun").sort_values(
+                        by="Naik/Turun", ascending=True
+                    )
+                ).assign(Milyar=topwp_kwl["Naik/Turun"] / 1000000000),
+                x="Milyar",
+                y="NAMA_WP",
+                orientation="h",
+                text="Naik/Turun",
+                height=640,
+                title="10 Besar Nominal Tumbuh",
+            )
+            barwil_nominal.update_traces(texttemplate="%{x:,.1f}M", textposition="auto")
+            barwil_nominal.update_layout(
+                paper_bgcolor="rgba(0, 0, 0, 0)",
+                plot_bgcolor="rgba(0, 0, 0, 0)",
+                xaxis_title="",
+                yaxis_title="",
+                xaxis={"visible": False},
+                title=dict(x=0.5),
+            )
+            colbarklu_naik = st.columns(2)
+            with colbarklu_naik[0]:
+                st.plotly_chart(barwil_persen, use_container_width=True)
+            with colbarklu_naik[1]:
+                st.plotly_chart(barwil_nominal, use_container_width=True)
+            with st.expander(label="Detail Data"):
+                st.dataframe(topwp_kwl, use_container_width=True, hide_index=True)
+            # ============================================
+            st.write("Klik Select untuk lihat data detail")
+            selection_df = dataframe_selection(data_kwl_pv)
+            with st.expander(label="Olah Lebih Lanjut?", expanded=False):
+                spread_df, code = spreadsheet(data_kwl.fillna(0), data_kwl_pv)
+            if len(selection_df) > 0:
+                selection_adm = selection_df["ADMIN"].unique()
+                selection_ar = selection_df["NAMA_AR"].unique()
+                filter_adm_seksi = f'{list_to_sql("ADMIN", selection_adm)} AND {list_to_sql("NAMA_AR", selection_ar)}'
+                df_det = detail_wp(filter_adm_seksi)
+                df_detail_uptonow = df_det[df_det["BULANBAYAR"] <= maxbulan]
+                df_detail = (
+                    pd.pivot_table(
+                        df_det,
+                        index=["NPWP15", "NAMA_WP", "NAMA_KLU"],
+                        columns="TAHUNBAYAR",
+                        values="sum",
+                        aggfunc="sum",
+                    )
+                ).reset_index()
+                df_detail_uptonow = (
+                    (
+                        pd.pivot_table(
+                            df_detail_uptonow[df_detail_uptonow["TAHUNBAYAR"] == 2022],
+                            index=["NPWP15", "NAMA_WP", "NAMA_KLU"],
+                            columns="TAHUNBAYAR",
+                            values="sum",
+                            aggfunc="sum",
+                        )
+                    )
+                    .reset_index()
+                    .rename(columns={2022: "2022BulanYgSama"})
+                )
+                df_detail = df_detail.merge(
+                    df_detail_uptonow, on=["NPWP15", "NAMA_WP", "NAMA_KLU"], how="left"
+                )
+                df_detail["Naik/Turun"] = df_detail[2023] - df_detail["2022BulanYgSama"]
+                df_detail["Ket"] = df_detail["Naik/Turun"].apply(
+                    lambda x: "Naik" if x > 0 else "Turun"
+                )
+                df_detail["%"] = (
+                    df_detail["Naik/Turun"] - df_detail["2022BulanYgSama"]
+                ) * 100
+                st.dataframe(df_detail, use_container_width=True, hide_index=True)
+                with st.expander(label="Olah Lebih Lanjut?", expanded=False):
+                    spread_df, code = spreadsheet(df_det)
+
     elif tabs == "SelfAnalytics":
         st.subheader("Self Service Explore, Analisa, dan Membuat Chart Mandiri")
-        adm = get_adm(st.session_state["username"])[0]
-        adm = adm[0]
+        adm = get_adm(st.session_state["username"])
+
         start, end, kpp, map, sektor, segmen, wp = filter_ui(adm)
         # filterdata
         filter_gabungan = cek_filter(start, end, kpp, map, sektor, segmen, wp)
@@ -1805,6 +2133,7 @@ if st.session_state["authentication_status"]:
         filter_date = "and".join(x for x in filter_gabungan[0][:2])
         filter_date22 = "and".join(x for x in filter_gabungan[1][:2])
         filter_cat = "and".join(x for x in filter_gabungan[1][2:])
+
         # filter22 = "and".join(x for x in filter_gabungan[1])
         # cek_kolom = conn.query("SELECT * from ppmpkm limit 1;")
 

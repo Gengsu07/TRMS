@@ -1,6 +1,11 @@
 [data-testid="stAppViewContainer"] {
   background-color: #f6f7f8;
 }
+
+/* delete whitespace diatas header*/
+.css-182eq0g{
+  display: none;
+}
 .css-18ni7ap {
   visibility: hidden;
 }
