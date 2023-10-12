@@ -6,9 +6,16 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
+from pandas.api.types import (
+    is_categorical_dtype,
+    is_datetime64_any_dtype,
+    is_numeric_dtype,
+    is_object_dtype,
+)
 
 load_dotenv()
 conn = st.experimental_connection("ppmpkm", type="sql")
+conn_mysql = st.experimental_connection("mysql", type="sql")
 # conn_uri = os.environ.get("CONN_URI")
 postgres_username = os.environ.get("POSTGRES_USERNAME")
 postgres_password = quote_plus(os.environ.get("POSTGRES_PASSWORD"))
@@ -1206,6 +1213,143 @@ def detail_wp_kwl(filter_date, filter_date22):
 def stats_data():
     lastUpdate = conn.query('select max(p."DATEBAYAR") from ppmpkm p')
     return lastUpdate.iloc[0, 0]
+
+
+def sptxmpn(filtermpn, filtermf, filterspt):
+    if filtermf:
+        kueri = f""" 
+            select
+            s.NPWP15,mf.NAMA_WP, s.KPPADM,mf.STATUS_WP, mf.STATUS_PKP,s.MASA_PAJAK,TAHUN_PAJAK,
+            sum(mf.NETTO) as "NETTO",
+            count(case when s.NO_TANDATERIMA is not null then 1 end)as "JML_LAPOR"
+        from spt.sidjp_masterspt s
+        right join  (
+            select m.NPWP15, m.NAMA_WP, m.STATUS_WP,p.MASA,
+                (case when m.NO_PKP is not null and m.NO_PKP_CABUT is null then 'PKP' else 'TIDAK PKP' end) as "STATUS_PKP",
+                sum(p.NETTO) as "NETTO"
+                from registrasi.sidjp_masterfile m
+                left join (
+                    select NPWP,MASA,
+                            sum(NOMINAL) as "NETTO"
+                    from mpninfo.ppm_pkm
+                    where  NPWP not like '000000000%' and {filtermpn}
+                    group by NPWP, MASA) p
+                on m.NPWP15 = p.NPWP
+                where STATUS_WP not in ('PL/DE','Aktivasi Sementara') and m.NPWP not like '000000000%'
+                    and {filtermf}
+                group by  m.NPWP15, m.NAMA_WP, m.STATUS_WP,p.MASA,
+                            (case when m.NO_PKP is not null and m.NO_PKP_CABUT is null then 'PKP' else 'TIDAK PKP' end)
+        ) mf
+        on (s.NPWP15 = mf.NPWP15 and s.MASA_PAJAK = cast(mf.MASA as integer))
+        where {filterspt}
+        group by  s.NPWP15,mf.NAMA_WP, s.KPPADM,mf.STATUS_WP, mf.STATUS_PKP,s.MASA_PAJAK  ,s.TAHUN_PAJAK
+    """
+    else:
+        kueri = f""" 
+            select
+            s.NPWP15,mf.NAMA_WP, s.KPPADM,mf.STATUS_WP, mf.STATUS_PKP,s.MASA_PAJAK,TAHUN_PAJAK,
+            sum(mf.NETTO) as "NETTO",
+            count(case when s.NO_TANDATERIMA is not null then 1 end)as "JML_LAPOR"
+        from spt.sidjp_masterspt s
+        right join  (
+            select m.NPWP15, m.NAMA_WP, m.STATUS_WP,p.MASA,
+                (case when m.NO_PKP is not null and m.NO_PKP_CABUT is null then 'PKP' else 'TIDAK PKP' end) as "STATUS_PKP",
+                sum(p.NETTO) as "NETTO"
+                from registrasi.sidjp_masterfile m
+                left join (
+                    select NPWP,MASA,
+                            sum(NOMINAL) as "NETTO"
+                    from mpninfo.ppm_pkm
+                    where  NPWP not like '000000000%' and {filtermpn}
+                    group by NPWP, MASA) p
+                on m.NPWP15 = p.NPWP
+                where STATUS_WP not in ('PL/DE','Aktivasi Sementara') and m.NPWP not like '000000000%'
+                group by  m.NPWP15, m.NAMA_WP, m.STATUS_WP,p.MASA,
+                            (case when m.NO_PKP is not null and m.NO_PKP_CABUT is null then 'PKP' else 'TIDAK PKP' end)
+        ) mf
+        on (s.NPWP15 = mf.NPWP15 and s.MASA_PAJAK = cast(mf.MASA as integer))
+        where {filterspt}
+        group by  s.NPWP15,mf.NAMA_WP, s.KPPADM,mf.STATUS_WP, mf.STATUS_PKP,s.MASA_PAJAK  ,s.TAHUN_PAJAK
+    """
+    data = conn_mysql.query(kueri)
+    return data
+
+
+def filter_dataframe(df: pd.DataFrame, key: int) -> pd.DataFrame:
+    """
+    Adds a UI on top of a dataframe to let viewers filter columns
+
+    Args:
+        df (pd.DataFrame): Original dataframe
+
+    Returns:
+        pd.DataFrame: Filtered dataframe
+    """
+    modify = st.checkbox("Filter Data", key=key)
+
+    if not modify:
+        return df
+
+    df = df.copy()
+
+    # Try to convert datetimes into a standard format (datetime, no timezone)
+    for col in df.columns:
+        if is_object_dtype(df[col]):
+            try:
+                df[col] = pd.to_datetime(df[col])
+            except Exception:
+                pass
+
+        if is_datetime64_any_dtype(df[col]):
+            df[col] = df[col].dt.tz_localize(None)
+
+    modification_container = st.container()
+
+    with modification_container:
+        to_filter_columns = st.multiselect("Filter Kolom Data", df.columns)
+        for column in to_filter_columns:
+            left, right = st.columns((1, 20))
+            left.write("↳")
+            # Treat columns with < 10 unique values as categorical
+            if is_categorical_dtype(df[column]) or df[column].nunique() < 10:
+                user_cat_input = right.multiselect(
+                    f"Values for {column}",
+                    df[column].unique(),
+                    default=list(df[column].unique()),
+                )
+                df = df[df[column].isin(user_cat_input)]
+            elif is_numeric_dtype(df[column]):
+                _min = float(df[column].min())
+                _max = float(df[column].max())
+                step = (_max - _min) / 100
+                user_num_input = right.slider(
+                    f"Values for {column}",
+                    _min,
+                    _max,
+                    (_min, _max),
+                    step=step,
+                )
+                df = df[df[column].between(*user_num_input)]
+            elif is_datetime64_any_dtype(df[column]):
+                user_date_input = right.date_input(
+                    f"Values for {column}",
+                    value=(
+                        df[column].min(),
+                        df[column].max(),
+                    ),
+                )
+                if len(user_date_input) == 2:
+                    user_date_input = tuple(map(pd.to_datetime, user_date_input))
+                    start_date, end_date = user_date_input
+                    df = df.loc[df[column].between(start_date, end_date)]
+            else:
+                user_text_input = right.text_input(
+                    f"Case Sensitif sesuai dalam data, Masukkan Substring or regex in {column}",
+                )
+                if user_text_input:
+                    df = df[df[column].str.contains(user_text_input)]
+
+    return df
 
 
 if __name__ == "__main__":
