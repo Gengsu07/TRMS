@@ -6,7 +6,11 @@ secondaryBackgroundColor="#44475a"
 textColor="#fff"
 #textColor="#f8f8f2"
 
-
+[theme]
+primaryColor="#ffca19"
+backgroundColor="#181818"
+secondaryBackgroundColor="#212121"
+textColor="#ffffff"
 
 #color kemenkeu
 #005FAC
